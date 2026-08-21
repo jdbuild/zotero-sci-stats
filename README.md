@@ -1,6 +1,6 @@
 # ZoteroSciStats
 
-![license](https://img.shields.io/badge/license-MIT-3b82f6) ![next.js](https://img.shields.io/badge/next.js-15-000000) ![mongodb](https://img.shields.io/badge/mongodb-cache%2Fsync-47A248) ![zotero api](https://img.shields.io/badge/zotero%20api-read--only-dc2f36)
+![license](https://img.shields.io/badge/license-MIT-3b82f6) ![next.js](https://img.shields.io/badge/next.js-16-000000) ![mongodb](https://img.shields.io/badge/mongodb-cache%2Fsync-47A248) ![zotero api](https://img.shields.io/badge/zotero%20api-read--only-dc2f36)
 
 Publication statistics for a Zotero library — filter by 1..N tags and a date
 range, and compare multiple such queries side by side (e.g. `#ICMT 2026` vs.
@@ -47,8 +47,8 @@ see [Read-only guarantee](ARCHITECTURE.md#read-only-guarantee).
 ## Quickstart
 
 ```bash
-git clone <this-repo-url> zoterosci-stats
-cd zoterosci-stats
+git clone https://github.com/jdbuild/zotero-sci-stats.git
+cd zotero-sci-stats
 npm install
 cp .env.example .env.local
 docker compose up -d

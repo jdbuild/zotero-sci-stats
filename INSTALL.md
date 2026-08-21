@@ -10,8 +10,8 @@
 ## 1. Clone and install
 
 ```bash
-git clone <this-repo-url> zoterosci-stats
-cd zoterosci-stats
+git clone https://github.com/jdbuild/zotero-sci-stats.git
+cd zotero-sci-stats
 npm install
 ```
 

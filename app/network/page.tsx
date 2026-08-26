@@ -6,6 +6,7 @@ import { QuerySetEditor, newQuerySet, type EditableQuerySet } from "@/components
 import { GlobalFilterBar, newGlobalFilter, formatPeriod, type GlobalFilter } from "@/components/GlobalFilterBar";
 import { NetworkGraph, rankNodesByCollab } from "@/components/NetworkGraph";
 import { CitationList } from "@/components/CitationList";
+import { TagInput } from "@/components/TagInput";
 import { CHART_COLORS } from "@/components/ComparisonChart";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 import type { Network } from "@/lib/stats/network";
@@ -15,6 +16,16 @@ function pct(count: number, total: number): string {
   return `${Math.round((count / total) * 100)}%`;
 }
 
+/** A network node's editor state, plus its attribution roster (annotation
+ * only - never narrows which items belong to this node). */
+interface EditableNode extends EditableQuerySet {
+  members: string[];
+}
+
+function newNode(name: string): EditableNode {
+  return { ...newQuerySet(name), members: [] };
+}
+
 interface StoredQuerySet {
   id: string;
   name: string;
@@ -22,6 +33,7 @@ interface StoredQuerySet {
   tagMode: "AND" | "OR";
   authors: string[];
   authorMode: "AND" | "OR";
+  members?: string[];
   excludedItemTypes?: string[];
   dateFrom: string | null;
   dateTo: string | null;
@@ -34,7 +46,21 @@ interface NetworkRunEntry {
   createdAt: string;
 }
 
-function NetworkResults({ network, period }: { network: Network; period: string }) {
+/** Whether a node declared any tracked authors at all - distinguishes "0
+ * because untracked" from "0 despite being tracked" in the origination display. */
+function isTracked(querySets: StoredQuerySet[], nodeId: string): boolean {
+  return (querySets.find((q) => q.id === nodeId)?.members?.length ?? 0) > 0;
+}
+
+function NetworkResults({
+  network,
+  period,
+  querySets,
+}: {
+  network: Network;
+  period: string;
+  querySets: StoredQuerySet[];
+}) {
   const { messages } = useLanguage();
   const t = messages.network;
   const tc = messages.compare;
@@ -127,6 +153,58 @@ function NetworkResults({ network, period }: { network: Network; period: string 
                     itemsTruncated: e.itemsTruncated,
                   }}
                 />
+                {(e.contributors ?? []).length > 0 && (
+                  <div className="mt-3 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+                    <p className="mb-1.5 text-xs font-medium text-zinc-500">{t.contributorsHeading}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(e.contributors ?? []).map((c) => (
+                        <span
+                          key={c.name}
+                          className="rounded bg-zinc-100 px-2 py-0.5 text-xs dark:bg-zinc-800"
+                        >
+                          {c.name} ({c.count})
+                          {c.side === "shared" && (
+                            <span className="ml-1 text-zinc-400">· {t.sharedMemberBadge}</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {(isTracked(querySets, e.sourceId) || isTracked(querySets, e.targetId)) && (
+                  <div className="mt-3 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+                    <p className="mb-1.5 text-xs font-medium text-zinc-500">{t.originatedByHeading}</p>
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                      {(e.originators ?? []).length === 0 ? (
+                        <span className="text-zinc-400">{t.noOriginators}</span>
+                      ) : (
+                        (e.originators ?? []).map((o) => (
+                          <span key={o.name} className="rounded bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">
+                            {o.name} ({o.count})
+                            {o.side === "shared" && (
+                              <span className="ml-1 text-zinc-400">· {t.sharedMemberBadge}</span>
+                            )}
+                          </span>
+                        ))
+                      )}
+                      {!isTracked(querySets, e.sourceId) && (
+                        <span className="rounded border border-dashed border-zinc-300 px-2 py-0.5 text-zinc-400 dark:border-zinc-700">
+                          {e.sourceName}: {t.notTracked}
+                        </span>
+                      )}
+                      {!isTracked(querySets, e.targetId) && (
+                        <span className="rounded border border-dashed border-zinc-300 px-2 py-0.5 text-zinc-400 dark:border-zinc-700">
+                          {e.targetName}: {t.notTracked}
+                        </span>
+                      )}
+                      {(e.untrackedOriginCount ?? 0) > 0 && (
+                        <span className="text-zinc-400">
+                          {t.untrackedOriginCount.replace("{count}", String(e.untrackedOriginCount))}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div
@@ -148,7 +226,7 @@ export default function NetworkPage() {
   const t = messages.network;
   const tc = messages.compare;
 
-  const [querySets, setQuerySets] = useState<EditableQuerySet[]>([newQuerySet("Set 1"), newQuerySet("Set 2")]);
+  const [querySets, setQuerySets] = useState<EditableNode[]>([newNode("Set 1"), newNode("Set 2")]);
   const [globalFilter, setGlobalFilter] = useState<GlobalFilter>(newGlobalFilter());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -175,7 +253,7 @@ export default function NetworkPage() {
     });
   }
 
-  function updateSet(id: string, patch: Partial<EditableQuerySet>) {
+  function updateSet(id: string, patch: Partial<EditableNode>) {
     setQuerySets((sets) => sets.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
 
@@ -184,7 +262,7 @@ export default function NetworkPage() {
   }
 
   function addSet() {
-    setQuerySets((sets) => [...sets, newQuerySet(`Set ${sets.length + 1}`)]);
+    setQuerySets((sets) => [...sets, newNode(`Set ${sets.length + 1}`)]);
   }
 
   function removeSet(id: string) {
@@ -200,6 +278,7 @@ export default function NetworkPage() {
         tagMode: s.tagMode,
         authors: s.authors ?? [],
         authorMode: s.authorMode ?? "OR",
+        members: s.members ?? [],
       }))
     );
     const first = entry.querySets[0];
@@ -231,6 +310,7 @@ export default function NetworkPage() {
         tagMode: s.tagMode,
         authors: s.authors,
         authorMode: s.authorMode,
+        members: s.members,
         excludedItemTypes: globalFilter.excludedItemTypes,
         dateFrom: globalFilter.dateFrom || null,
         dateTo: globalFilter.dateTo || null,
@@ -279,6 +359,21 @@ export default function NetworkPage() {
             globalFilter={globalFilter}
             onChange={(patch) => updateSet(s.id, patch)}
             onRemove={querySets.length > 2 ? () => removeSet(s.id) : null}
+            extra={(facets) => (
+              <div>
+                <label className="mt-3 block text-xs font-medium text-zinc-500">{t.trackedAuthorsLabel}</label>
+                <div className="mt-1">
+                  <TagInput
+                    tags={s.members}
+                    onChange={(members) => updateSet(s.id, { members })}
+                    suggestions={facets.authors}
+                    placeholder={t.trackedAuthorsPlaceholder}
+                    prefix=""
+                  />
+                </div>
+                <p className="mt-1 text-xs text-zinc-400">{t.trackedAuthorsHint}</p>
+              </div>
+            )}
           />
         ))}
       </div>
@@ -341,7 +436,7 @@ export default function NetworkPage() {
 
                   {expanded && (
                     <div className="border-t border-zinc-200 p-4 dark:border-zinc-800">
-                      <NetworkResults network={entry.network} period={period} />
+                      <NetworkResults network={entry.network} period={period} querySets={entry.querySets} />
                     </div>
                   )}
                 </div>

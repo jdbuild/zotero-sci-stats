@@ -179,6 +179,7 @@ export function NetworkGraph({ nodes, edges }: { nodes: NetworkNode[]; edges: Ne
 
   const maxCollab = Math.max(1, ...Array.from(collabTotals.values()));
   const maxCount = Math.max(1, ...edges.map((e) => e.count));
+  const colorByNodeId = new Map(nodes.map((n, i) => [n.id, CHART_COLORS[i % CHART_COLORS.length]]));
 
   return (
     <svg ref={svgRef} viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="h-auto w-full select-none">
@@ -191,18 +192,73 @@ export function NetworkGraph({ nodes, edges }: { nodes: NetworkNode[]; edges: Ne
           const opacity = e.count > 0 ? 0.25 + (e.count / maxCount) * 0.6 : 0.12;
           const midX = (p1.x + p2.x) / 2;
           const midY = (p1.y + p2.y) / 2;
+
+          // Split the line into "originated by source" / neutral /
+          // "originated by target" segments when at least one side has a
+          // clean, unambiguous (non-"shared") first-author claim. Items
+          // with no roster data at all keep the plain single-color line -
+          // zero visual change for anyone not using tracked authors.
+          const sourceOriginCount = (e.originators ?? [])
+            .filter((o) => o.side === "source")
+            .reduce((sum, o) => sum + o.count, 0);
+          const targetOriginCount = (e.originators ?? [])
+            .filter((o) => o.side === "target")
+            .reduce((sum, o) => sum + o.count, 0);
+          const fracSource = e.count > 0 ? sourceOriginCount / e.count : 0;
+          const fracTarget = e.count > 0 ? targetOriginCount / e.count : 0;
+          const showSplit = fracSource > 0 || fracTarget > 0;
+
+          const lerp = (t: number) => ({ x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t });
+          const pA = lerp(fracSource);
+          const pB = lerp(1 - fracTarget);
+          const sourceColor = colorByNodeId.get(e.sourceId) ?? "currentColor";
+          const targetColor = colorByNodeId.get(e.targetId) ?? "currentColor";
+
           return (
             <g key={`${e.sourceId}-${e.targetId}`}>
-              <line
-                x1={p1.x}
-                y1={p1.y}
-                x2={p2.x}
-                y2={p2.y}
-                stroke="currentColor"
-                className="text-zinc-400 dark:text-zinc-600"
-                strokeWidth={strokeWidth}
-                opacity={opacity}
-              />
+              {showSplit ? (
+                <>
+                  <line
+                    x1={p1.x}
+                    y1={p1.y}
+                    x2={pA.x}
+                    y2={pA.y}
+                    stroke={sourceColor}
+                    strokeWidth={strokeWidth}
+                    opacity={opacity}
+                  />
+                  <line
+                    x1={pA.x}
+                    y1={pA.y}
+                    x2={pB.x}
+                    y2={pB.y}
+                    stroke="currentColor"
+                    className="text-zinc-400 dark:text-zinc-600"
+                    strokeWidth={strokeWidth}
+                    opacity={opacity}
+                  />
+                  <line
+                    x1={pB.x}
+                    y1={pB.y}
+                    x2={p2.x}
+                    y2={p2.y}
+                    stroke={targetColor}
+                    strokeWidth={strokeWidth}
+                    opacity={opacity}
+                  />
+                </>
+              ) : (
+                <line
+                  x1={p1.x}
+                  y1={p1.y}
+                  x2={p2.x}
+                  y2={p2.y}
+                  stroke="currentColor"
+                  className="text-zinc-400 dark:text-zinc-600"
+                  strokeWidth={strokeWidth}
+                  opacity={opacity}
+                />
+              )}
               {e.count > 0 && (
                 <g transform={`translate(${midX}, ${midY})`}>
                   <rect

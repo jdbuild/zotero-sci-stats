@@ -13,7 +13,23 @@ import {
 import type { QuerySetStats } from "@/lib/stats/aggregate";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
 
-export const CHART_COLORS = ["#dc2f36", "#2563eb", "#16a34a", "#d97706", "#7c3aed", "#0891b2"];
+// 12 colors so up to a dozen query sets/nodes stay visually distinguishable
+// (the first 6 are unchanged from before, so anything with <=6 sets looks
+// exactly as it always has - the rest fill the largest remaining hue gaps).
+export const CHART_COLORS = [
+  "#dc2f36", // red
+  "#2563eb", // blue
+  "#16a34a", // green
+  "#d97706", // amber
+  "#7c3aed", // violet
+  "#0891b2", // cyan
+  "#65a30d", // lime
+  "#db2777", // pink
+  "#c026d3", // fuchsia
+  "#4f46e5", // indigo
+  "#0d9488", // teal
+  "#92400e", // brown
+];
 
 export function ComparisonChart({ stats }: { stats: QuerySetStats[] }) {
   const { messages } = useLanguage();

@@ -109,6 +109,15 @@ export interface Messages {
     historyHeading: string;
     historyEmpty: string;
     deleteRun: string;
+    trackedAuthorsLabel: string;
+    trackedAuthorsPlaceholder: string;
+    trackedAuthorsHint: string;
+    contributorsHeading: string;
+    sharedMemberBadge: string;
+    originatedByHeading: string;
+    noOriginators: string;
+    notTracked: string;
+    untrackedOriginCount: string;
   };
   common: {
     unknownError: string;
@@ -243,6 +252,16 @@ export const translations: Record<Language, Messages> = {
       historyHeading: "Frühere Netzwerke",
       historyEmpty: "Noch keine Netzwerke gespeichert.",
       deleteRun: "Netzwerk löschen",
+      trackedAuthorsLabel: "Erfasste Autor:innen (optional)",
+      trackedAuthorsPlaceholder: "Namen eingeben, Enter drücken…",
+      trackedAuthorsHint:
+        "Schränkt diesen Knoten nicht ein - zeigt nur, wer hinter den unten stehenden Verbindungen steckt.",
+      contributorsHeading: "Beteiligt",
+      sharedMemberBadge: "auf beiden Listen",
+      originatedByHeading: "Erstautor:in",
+      noOriginators: "Keine erfassten Erstautor:innen in diesen Publikationen.",
+      notTracked: "nicht erfasst",
+      untrackedOriginCount: "{count} mit nicht erfasster oder unbekannter Erstautor:in",
     },
     common: {
       unknownError: "Unbekannter Fehler.",
@@ -375,6 +394,16 @@ export const translations: Record<Language, Messages> = {
       historyHeading: "Previous networks",
       historyEmpty: "No networks saved yet.",
       deleteRun: "Delete network",
+      trackedAuthorsLabel: "Tracked authors (optional)",
+      trackedAuthorsPlaceholder: "Add a name, press Enter…",
+      trackedAuthorsHint:
+        "Doesn't narrow this node - only shows who's behind the connections below.",
+      contributorsHeading: "Contributors",
+      sharedMemberBadge: "on both lists",
+      originatedByHeading: "Originated by",
+      noOriginators: "No tracked first authors among these publications.",
+      notTracked: "not tracked",
+      untrackedOriginCount: "{count} with an untracked or unlisted first author",
     },
     common: {
       unknownError: "Unknown error.",

@@ -9,3 +9,11 @@ export function creatorFullName(creator: ZoteroCreator): string {
 export function creatorNames(creators: ZoteroCreator[] | undefined): string[] {
   return (creators ?? []).map(creatorFullName).filter(Boolean);
 }
+
+/** The first creator with role "author" (in Zotero's own order) - skips
+ * editors/translators/etc. that might otherwise be listed first. */
+export function firstAuthorName(creators: ZoteroCreator[] | undefined): string | null {
+  const author = (creators ?? []).find((c) => c.creatorType === "author");
+  if (!author) return null;
+  return creatorFullName(author) || null;
+}

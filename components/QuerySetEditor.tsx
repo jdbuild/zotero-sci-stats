@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Trash2 } from "lucide-react";
 import { TagInput } from "@/components/TagInput";
 import { CHART_COLORS } from "@/components/ComparisonChart";
@@ -27,7 +27,7 @@ export function newQuerySet(name = ""): EditableQuerySet {
   };
 }
 
-interface Facets {
+export interface Facets {
   tags: string[];
   authors: string[];
 }
@@ -40,6 +40,7 @@ export function QuerySetEditor({
   globalFilter,
   onChange,
   onRemove,
+  extra,
 }: {
   value: EditableQuerySet;
   colorIndex: number;
@@ -47,6 +48,13 @@ export function QuerySetEditor({
   globalFilter: GlobalFilter;
   onChange: (patch: Partial<EditableQuerySet>) => void;
   onRemove: (() => void) | null;
+  /**
+   * Extra content rendered inside this card, below the tags/authors
+   * fields. Pass a function to get access to this node's own tag-scoped
+   * author suggestions (the same ones the Authors field above uses),
+   * without re-fetching them.
+   */
+  extra?: ReactNode | ((facets: Facets) => ReactNode);
 }) {
   const { messages } = useLanguage();
   const t = messages.compare;
@@ -143,6 +151,8 @@ export function QuerySetEditor({
           <option value="OR">{t.authorModeOr}</option>
         </select>
       </div>
+
+      {typeof extra === "function" ? extra(facets) : extra}
     </div>
   );
 }

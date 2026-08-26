@@ -1,0 +1,19 @@
+# Marks paths to exclude from `git archive` output (used by
+# scripts/build-for-sftp.sh to package a deploy bundle). These files stay
+# completely normal in the repo/GitHub - this only trims what ends up in
+# the packaged folder/zip, to keep it down to what's actually needed to
+# run `npm install && npm run build && npm run start` on a server.
+
+.claude/ export-ignore
+.gitattributes export-ignore
+.gitignore export-ignore
+AGENTS.md export-ignore
+ARCHITECTURE.md export-ignore
+CLAUDE.md export-ignore
+INSTALL.md export-ignore
+LICENSE export-ignore
+README.md export-ignore
+REQUIREMENTS.md export-ignore
+docker-compose.yml export-ignore
+eslint.config.mjs export-ignore
+scripts/ export-ignore

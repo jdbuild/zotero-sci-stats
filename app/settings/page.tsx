@@ -1,8 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, RefreshCw, Wrench } from "lucide-react";
+import { Loader2, RefreshCw, Wrench, UserPlus, Trash2, Copy, Check } from "lucide-react";
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
+
+interface MemberState {
+  id: string;
+  username: string;
+  role: "admin" | "member";
+  createdAt: string;
+}
 
 interface LibraryRef {
   id: string;
@@ -60,6 +67,71 @@ export default function SettingsPage() {
   const [reprocessing, setReprocessing] = useState(false);
   const [reprocessResult, setReprocessResult] = useState<number | null>(null);
   const [reprocessError, setReprocessError] = useState("");
+
+  const [showAccessSection, setShowAccessSection] = useState(false);
+  const [members, setMembers] = useState<MemberState[]>([]);
+  const [newUsername, setNewUsername] = useState("");
+  const [addingMember, setAddingMember] = useState(false);
+  const [addMemberError, setAddMemberError] = useState("");
+  const [justCreated, setJustCreated] = useState<{ username: string; password: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const loadMembers = useCallback(async () => {
+    const res = await fetch("/api/users");
+    if (!res.ok) return;
+    const data = await res.json();
+    setMembers(data.users ?? []);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        const isAdmin = d.authEnabled && d.role === "admin";
+        setShowAccessSection(isAdmin);
+        if (isAdmin) void loadMembers();
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadMembers]);
+
+  async function addMember() {
+    if (!newUsername.trim()) return;
+    setAddingMember(true);
+    setAddMemberError("");
+    setJustCreated(null);
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: newUsername.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? messages.common.unknownError);
+      setJustCreated({ username: data.username, password: data.password });
+      setNewUsername("");
+      await loadMembers();
+    } catch (err) {
+      setAddMemberError(err instanceof Error ? err.message : messages.common.unknownError);
+    } finally {
+      setAddingMember(false);
+    }
+  }
+
+  async function removeMember(id: string) {
+    setMembers((prev) => prev.filter((m) => m.id !== id));
+    await fetch(`/api/users/${id}`, { method: "DELETE" });
+    await loadMembers();
+  }
+
+  async function copyPassword(password: string) {
+    await navigator.clipboard.writeText(password);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   const loadConfig = useCallback(async () => {
     const res = await fetch("/api/config");
@@ -311,6 +383,80 @@ export default function SettingsPage() {
         )}
         {reprocessError && <p className="mt-2 text-sm text-red-600">{reprocessError}</p>}
       </section>
+
+      {showAccessSection && (
+        <section className="mt-6 rounded-lg border border-zinc-200 p-5 dark:border-zinc-800">
+          <h2 className="font-semibold">{t.accessHeading}</h2>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{t.accessHint}</p>
+
+          <div className="mt-4 flex gap-2">
+            <input
+              value={newUsername}
+              onChange={(e) => setNewUsername(e.target.value)}
+              placeholder={t.usernamePlaceholder}
+              className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            />
+            <button
+              onClick={addMember}
+              disabled={!newUsername.trim() || addingMember}
+              className="flex items-center gap-2 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-zinc-900"
+            >
+              {addingMember ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+              {addingMember ? t.addingMember : t.addMember}
+            </button>
+          </div>
+          {addMemberError && <p className="mt-2 text-sm text-red-600">{addMemberError}</p>}
+
+          {justCreated && (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-md bg-zinc-100 px-3 py-2 text-sm dark:bg-zinc-900">
+              <span>
+                {t.newMemberPasswordNotice.replace("{username}", justCreated.username)}{" "}
+                <code className="font-mono font-semibold">{justCreated.password}</code>
+              </span>
+              <button
+                onClick={() => copyPassword(justCreated.password)}
+                className="flex shrink-0 items-center gap-1 rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium hover:bg-zinc-200 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              >
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? t.copied : t.copyPassword}
+              </button>
+            </div>
+          )}
+
+          {members.length > 0 ? (
+            <table className="mt-4 w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-200 text-left dark:border-zinc-800">
+                  <th className="py-2 pr-4 font-normal text-zinc-500">{t.memberUsernameColumn}</th>
+                  <th className="py-2 pr-4 font-normal text-zinc-500">{t.memberRoleColumn}</th>
+                  <th className="py-2 pr-4 font-normal text-zinc-500">{t.memberCreatedColumn}</th>
+                  <th className="py-2 pr-4" />
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((m) => (
+                  <tr key={m.id} className="border-b border-zinc-100 dark:border-zinc-900">
+                    <td className="py-2 pr-4">{m.username}</td>
+                    <td className="py-2 pr-4 text-zinc-600 dark:text-zinc-400">{m.role}</td>
+                    <td className="py-2 pr-4 text-zinc-600 dark:text-zinc-400">
+                      {new Date(m.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {m.role !== "admin" && (
+                        <button onClick={() => removeMember(m.id)} aria-label={t.removeMember}>
+                          <Trash2 className="h-4 w-4 text-zinc-400 hover:text-red-600" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="mt-4 text-sm text-zinc-500">{t.noMembersYet}</p>
+          )}
+        </section>
+      )}
     </main>
   );
 }

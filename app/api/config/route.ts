@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db/mongodb";
 import { Config } from "@/lib/db/models/Config";
+import { isAdminOrAuthDisabled } from "@/lib/auth/session";
 
 function maskKey(key: string): string {
   if (key.length <= 6) return "*".repeat(key.length);
@@ -8,6 +9,9 @@ function maskKey(key: string): string {
 }
 
 export async function GET() {
+  if (!(await isAdminOrAuthDisabled())) {
+    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  }
   await connectToDatabase();
   const config = await Config.findOne({ singleton: "config" }).lean();
 
@@ -25,6 +29,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!(await isAdminOrAuthDisabled())) {
+    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  }
   const body = await request.json();
   const { zoteroApiKey, libraryId, libraryType, libraryName } = body ?? {};
 

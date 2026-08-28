@@ -76,7 +76,26 @@ button top right.
    Settings page shows the cache size, how long the sync took, and how
    many items were added/updated/deleted.
 
-## 7. Use it
+## 7. (Optional) Require login for a hosted demo
+
+By default there's no login — fine for local, single-user use. If you're
+putting this instance somewhere other people can reach it, add these
+three lines to `.env.local`:
+
+```bash
+NEXT_PUBLIC_AUTH_ENABLED=true
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=choose-a-real-password
+```
+
+Restart the app, then log in once with those credentials — that creates
+the admin account in MongoDB (hashed) and the two env vars aren't read
+again afterward. From **Settings → Access management** (admin only), add
+an account for each person who needs access; each one gets a random
+password shown once, for you to share with them. See
+[ARCHITECTURE.md](ARCHITECTURE.md#access-management) for how this works.
+
+## 8. Use it
 
 Go to **Tag Compare**. Set the shared date range and publication type once at
 the top (day-precision, with "+1 month"/"+1 year" buttons to quickly shift

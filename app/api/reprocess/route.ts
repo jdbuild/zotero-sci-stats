@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { reprocessDerivedFields } from "@/lib/zotero/reprocess";
 import { SyncNotConfiguredError } from "@/lib/zotero/sync";
+import { isAdminOrAuthDisabled } from "@/lib/auth/session";
 
 /**
  * Recomputes derived fields (author names, publication year) for the
@@ -9,6 +10,9 @@ import { SyncNotConfiguredError } from "@/lib/zotero/sync";
  * field existed pick it up without a full re-sync.
  */
 export async function POST() {
+  if (!(await isAdminOrAuthDisabled())) {
+    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  }
   try {
     const result = await reprocessDerivedFields();
     return NextResponse.json({ ok: true, ...result });

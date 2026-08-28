@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAccessibleGroups, getKeyInfo, ZoteroApiError } from "@/lib/zotero/client";
 import type { ZoteroLibraryRef } from "@/lib/zotero/types";
+import { isAdminOrAuthDisabled } from "@/lib/auth/session";
 
 /**
  * Given a Zotero API key, discovers every library it can read: the user's
@@ -8,6 +9,9 @@ import type { ZoteroLibraryRef } from "@/lib/zotero/types";
  * to the Zotero API only.
  */
 export async function POST(request: Request) {
+  if (!(await isAdminOrAuthDisabled())) {
+    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  }
   const { apiKey } = (await request.json()) ?? {};
 
   if (!apiKey || typeof apiKey !== "string") {

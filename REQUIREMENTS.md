@@ -292,11 +292,48 @@ fields - rosters are small, human-curated lists, and the network-wide
 lookup is built once and reused across every edge, rather than rebuilt
 per-pair as before.
 
+## Follow-up: optional access management for a hosted demo (branch `access-management`)
+
+The single-user/no-login decision from the original request still holds
+for local, internal use - but the user also wants to put a demo of the
+app somewhere reachable by other people, which needs *some* gate.
+Resolved by making the whole feature an opt-in flag rather than
+replacing the original model: unset, nothing changes from before; set,
+the app requires login and Settings requires an admin.
+
+| Requirement | Status |
+| --- | --- |
+| Secure the Settings page behind an admin login | ✅ Two layers: `proxy.ts` optimistically redirects a non-admin away from `/settings` using a cheap role-hint cookie, and every Settings-related Route Handler (`/api/config`, `/api/sync`, `/api/reprocess`, `/api/zotero/libraries`) independently re-checks admin status server-side via `isAdminOrAuthDisabled()` - confirmed by curling one of those endpoints directly as a logged-in member and getting `403`, not just relying on the page being hidden. |
+| A handful (4-5) of member accounts, created from Settings with a generated username/password | ✅ "Access management" section on Settings, admin-only: username field + "Add member", each new member gets a random 12-character password shown exactly once in a copy-to-clipboard banner, and a table of all accounts with a remove button (self-deletion blocked). |
+| Store it simply in MongoDB | ✅ Two new collections, `users` and `sessions` - see [ARCHITECTURE.md § Access management](ARCHITECTURE.md#access-management). |
+| Balance "fine as-is for internal use" against "want a demo for certain people" | ✅ A single `NEXT_PUBLIC_AUTH_ENABLED` flag in `.env.local`. Absent or not `"true"`: the entire feature is a no-op, byte-for-byte the same behavior as before it existed (confirmed live - see verification below). Set to `"true"`: login is required app-wide and Settings requires the admin role. |
+| Whole app requires login, not just Settings; Settings additionally requires admin | ✅ Confirmed via clarifying question before implementation. `proxy.ts` gates every route once enabled; the admin-only redirect is scoped to `/settings` specifically. |
+| Session length | ✅ 7 days (recommended option, confirmed before implementation). |
+| Where does the first admin account come from | ✅ `ADMIN_USERNAME`/`ADMIN_PASSWORD` env vars, read once on first login attempt after the flag is enabled (`ensureBootstrapAdmin()`) - hashed immediately into the `users` collection and never read again afterward. Chosen over a "first person to sign up becomes admin" wizard specifically because that pattern race-conditions once the app is actually reachable by strangers on a hosted demo. |
+
+**Verification performed**: build + lint pass. Live-tested against an
+**isolated** Atlas database (`zoterosci-stats-authtest` - a separate
+database name on the same cluster, `.env.local` temporarily repointed at
+it and restored to the exact original value afterward, real production
+data never touched) with the flag temporarily enabled: confirmed the
+disabled state first (unset flag - app behaved identically to before,
+Settings reachable, no login prompt), then the enabled state - login
+redirect for an unauthenticated visit to any page, bootstrap admin
+creation and login on first attempt, a created member's one-time
+password login working, a member correctly bounced from `/settings`
+back to `/` (both via the nav link and a direct URL), a member's direct
+`POST /api/config` call returning `403` even though the UI never shows
+it that option, logout clearing the session, and the admin regaining
+full access including the Access management table afterward. Test
+accounts were removed and `.env.local` restored before finishing.
+
 ## Open / explicitly deferred
 
 - Automatic sync on app startup (currently manual button only).
 - Reloading/saving named query sets via the `savedquerys` collection in
   the Compare UI (model exists, UI wiring doesn't).
-- Multi-user / login support - explicitly out of scope per the "single-user,
-  local only" decision above; would be a new architecture discussion if
-  ever needed.
+- Multi-user / login support for the *default*, local/internal use case -
+  still intentionally off unless `NEXT_PUBLIC_AUTH_ENABLED` is explicitly
+  set, per the original "single-user, local only" decision; see the
+  access-management follow-up above for the opt-in version built for a
+  hosted demo.

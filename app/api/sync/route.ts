@@ -3,8 +3,12 @@ import { connectToDatabase } from "@/lib/db/mongodb";
 import { Config } from "@/lib/db/models/Config";
 import { getCacheSizeBytes } from "@/lib/stats/aggregate";
 import { getSyncStatus, runSync, SyncNotConfiguredError } from "@/lib/zotero/sync";
+import { isAdminOrAuthDisabled } from "@/lib/auth/session";
 
 export async function GET() {
+  if (!(await isAdminOrAuthDisabled())) {
+    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  }
   const status = await getSyncStatus();
 
   await connectToDatabase();
@@ -15,6 +19,9 @@ export async function GET() {
 }
 
 export async function POST() {
+  if (!(await isAdminOrAuthDisabled())) {
+    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  }
   try {
     const result = await runSync();
     return NextResponse.json({ ok: true, ...result });

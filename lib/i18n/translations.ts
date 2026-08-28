@@ -11,6 +11,15 @@ export interface Messages {
     compare: string;
     network: string;
     settings: string;
+    logout: string;
+  };
+  auth: {
+    loginTitle: string;
+    loginSubtitle: string;
+    usernameLabel: string;
+    passwordLabel: string;
+    loginButton: string;
+    loggingIn: string;
   };
   home: {
     title: string;
@@ -49,6 +58,19 @@ export interface Messages {
     reprocessButton: string;
     reprocessing: string;
     reprocessDone: string;
+    accessHeading: string;
+    accessHint: string;
+    addMember: string;
+    addingMember: string;
+    usernamePlaceholder: string;
+    newMemberPasswordNotice: string;
+    copyPassword: string;
+    copied: string;
+    memberUsernameColumn: string;
+    memberRoleColumn: string;
+    memberCreatedColumn: string;
+    removeMember: string;
+    noMembersYet: string;
   };
   compare: {
     title: string;
@@ -137,6 +159,15 @@ export const translations: Record<Language, Messages> = {
       compare: "Tag-Vergleich",
       network: "Tag NetzwerkVis",
       settings: "Einstellungen",
+      logout: "Abmelden",
+    },
+    auth: {
+      loginTitle: "Anmelden",
+      loginSubtitle: "Bitte meldet euch an, um ZoteroSciStats zu nutzen.",
+      usernameLabel: "Benutzername",
+      passwordLabel: "Passwort",
+      loginButton: "Anmelden",
+      loggingIn: "Melde an…",
     },
     home: {
       title: "ZoteroSciStats",
@@ -195,6 +226,21 @@ export const translations: Record<Language, Messages> = {
       reprocessButton: "Cache neu verarbeiten (kein Zotero-Zugriff)",
       reprocessing: "Verarbeite…",
       reprocessDone: "Einträge neu verarbeitet",
+      accessHeading: "Zugriffsverwaltung",
+      accessHint:
+        "Erstellt Konten für Kolleg:innen, die diese Instanz nutzen sollen. Nur sichtbar und wirksam, wenn Zugriffsverwaltung für diese Bereitstellung aktiviert ist.",
+      addMember: "Mitglied hinzufügen",
+      addingMember: "Erstelle…",
+      usernamePlaceholder: "Benutzername",
+      newMemberPasswordNotice:
+        "Passwort für {username} - jetzt kopieren und weitergeben, es wird nicht erneut angezeigt:",
+      copyPassword: "Kopieren",
+      copied: "Kopiert",
+      memberUsernameColumn: "Benutzername",
+      memberRoleColumn: "Rolle",
+      memberCreatedColumn: "Erstellt",
+      removeMember: "Entfernen",
+      noMembersYet: "Noch keine Mitglieder erstellt.",
     },
     compare: {
       title: "Tag-Vergleich",
@@ -285,6 +331,15 @@ export const translations: Record<Language, Messages> = {
       compare: "Tag Compare",
       network: "Tag NetworkVis",
       settings: "Settings",
+      logout: "Log out",
+    },
+    auth: {
+      loginTitle: "Log in",
+      loginSubtitle: "Please log in to use ZoteroSciStats.",
+      usernameLabel: "Username",
+      passwordLabel: "Password",
+      loginButton: "Log in",
+      loggingIn: "Logging in…",
     },
     home: {
       title: "ZoteroSciStats",
@@ -343,6 +398,20 @@ export const translations: Record<Language, Messages> = {
       reprocessButton: "Reprocess cache (no Zotero access)",
       reprocessing: "Processing…",
       reprocessDone: "items reprocessed",
+      accessHeading: "Access management",
+      accessHint:
+        "Create accounts for colleagues who should use this instance. Only visible and effective when access management is enabled for this deployment.",
+      addMember: "Add member",
+      addingMember: "Creating…",
+      usernamePlaceholder: "Username",
+      newMemberPasswordNotice: "Password for {username} - copy and share it now, it won't be shown again:",
+      copyPassword: "Copy",
+      copied: "Copied",
+      memberUsernameColumn: "Username",
+      memberRoleColumn: "Role",
+      memberCreatedColumn: "Created",
+      removeMember: "Remove",
+      noMembersYet: "No members created yet.",
     },
     compare: {
       title: "Tag Compare",

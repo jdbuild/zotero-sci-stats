@@ -50,6 +50,8 @@ This is enforced at two independent layers:
 | `syncmetas` | One document per library: last synced Zotero library version, status, item count, last-run duration/bytes/added/updated/deleted. |
 | `comparisonruns` | History of comparisons run on the Compare page (the query sets used + the computed stats), newest 20 per library. Lets past comparisons stay on the page across reloads. |
 | `savedquerys` | Reusable named query sets (tags, tag mode, year range). Not required for the UI to work — the Compare page also works with ad-hoc, unsaved query sets. |
+| `users` | Only populated when access management is enabled (see below): `username`, `passwordHash` (bcrypt), `role` (`admin`/`member`). |
+| `sessions` | Opaque session tokens, only populated when access management is enabled: `token`, `userId`, `role`, `expiresAt` — a MongoDB TTL index (`expireAfterSeconds: 0` on `expiresAt`) deletes expired sessions automatically. |
 
 `items.publicationYear` and `items.publicationDate` are both parsed once
 at sync time from Zotero's free-text `date` field
@@ -393,19 +395,103 @@ shows the date range it was run with (`formatPeriod` in
 `GlobalFilterBar.tsx`, shared with Compare's Overview), since that's easy
 to lose track of once you're looking at results further down the page.
 
+## Access management
+
+Off by default. The app was originally built single-user/no-login (see
+[REQUIREMENTS.md](REQUIREMENTS.md)), but a hosted demo for a handful of
+named people needs some gate. Rather than replace the original model, the
+whole feature is a no-op unless explicitly switched on:
+
+```ts
+// lib/auth/session.ts
+export function isAuthEnabled(): boolean {
+  return process.env.NEXT_PUBLIC_AUTH_ENABLED === "true";
+}
+```
+
+`NEXT_PUBLIC_...` (not a plain server-only env var) is deliberate: Nav and
+the Settings page need to know client-side whether to show the Login/
+Logout button and the Access management section, and Next.js only
+inlines `NEXT_PUBLIC_` variables into client bundles at build time.
+
+### Two-layer check, per Next's own current guidance
+
+`middleware.ts` is deprecated and renamed to `proxy.ts` in this Next.js
+version (`node_modules/next/dist/docs/.../proxy.md`), and Proxy now runs
+in the Node.js runtime by default rather than being Edge-restricted. Its
+own docs recommend against querying a database from Proxy on every
+navigation (including prefetches), so the pattern here is:
+
+1. **Optimistic** (`proxy.ts`, every request): checks only whether a
+   `session` cookie is *present*, no database round-trip. No cookie on a
+   protected path → redirect to `/login` (or `401` for `/api/*`). A
+   second, separate cookie (`role`, set alongside `session` at login) lets
+   Proxy also redirect a logged-in non-admin away from `/settings`
+   specifically — still just a cheap hint, never trusted as the real
+   check.
+2. **Secure** (inside each protected Route Handler): `getCurrentSession()`
+   in [`lib/auth/session.ts`](lib/auth/session.ts) looks the token up in
+   the `sessions` collection and confirms it hasn't expired. Every
+   Settings-related route (`/api/config`, `/api/sync`, `/api/reprocess`,
+   `/api/zotero/libraries`) calls `isAdminOrAuthDisabled()`, and
+   `/api/users`/`/api/users/[id]` call `requireAdmin()` — so even a
+   request that skips the UI entirely (a direct `curl`/`fetch`) still gets
+   `403` from a non-admin. This is what actually matters; the Proxy layer
+   only avoids a flash of protected content and an extra round-trip.
+
+`requireAdmin()` and `isAdminOrAuthDisabled()` differ in one thing: what
+happens when the feature is switched **off**. `requireAdmin()` (used by
+the member-management routes, which are meaningless without the feature)
+returns "not admin" either way. `isAdminOrAuthDisabled()` (used by the
+core app routes — Zotero connection, sync, reprocess — which must keep
+working exactly as before on a deployment that never turns this on)
+returns "allowed" when the feature is off, and only starts checking the
+real role once it's on.
+
+### Sessions and passwords
+
+Sessions are opaque random tokens (two concatenated `crypto.randomUUID()`
+calls), not JWTs — nothing is encoded in the token itself, so there's
+nothing to verify a signature for; the token is only ever a lookup key
+into the `sessions` collection, which is also what makes instant logout
+and remote session revocation trivial (delete the row). Passwords are
+hashed with `bcryptjs` (10 salt rounds) — the pure-JS package, not native
+`bcrypt`, specifically to avoid the native-binary/WSL mismatch this
+project has already run into once with other dependencies.
+
+### Bootstrapping the first admin
+
+There's no "first person to sign up becomes admin" wizard, because that
+pattern race-conditions the moment the app is actually reachable by
+people other than the deploying admin. Instead, `ADMIN_USERNAME`/
+`ADMIN_PASSWORD` env vars (same trust tier as `MONGODB_URI` — never
+committed) are read exactly once, from
+[`lib/auth/bootstrap.ts`](lib/auth/bootstrap.ts)'s `ensureBootstrapAdmin()`,
+called at the top of the login route: if no admin exists yet in `users`,
+it hashes the env var password and upserts the admin account. After that
+first login, the plaintext password is never read again — the env vars
+can be left in place (harmless — bootstrap is a no-op once an admin
+exists) or removed. Every account created after that first admin (the
+4-5 members the demo needs) comes from the Settings page's "Add member"
+button instead: `POST /api/users` generates a random password, hashes
+it, and returns the **plaintext exactly once** in the response body —
+that response is the only place it ever exists outside the admin's own
+clipboard; it is never logged or stored.
+
 ## Project structure
 
 ```
 app/
   page.tsx              landing page
-  settings/page.tsx      connect Zotero, run sync, reprocess cache
+  login/page.tsx          login form (only reachable when access management is on)
+  settings/page.tsx      connect Zotero, run sync, reprocess cache, manage members (admin)
   compare/page.tsx       build & compare query sets, history
   network/page.tsx       collaboration network (pairwise overlap graph)
   api/
-    config/route.ts       read/write the connected-library config
-    zotero/libraries/route.ts   discover libraries for an API key
-    sync/route.ts          trigger sync / read sync status + cache size
-    reprocess/route.ts     recompute derived fields, no Zotero calls
+    config/route.ts       read/write the connected-library config (admin-gated when enabled)
+    zotero/libraries/route.ts   discover libraries for an API key (admin-gated when enabled)
+    sync/route.ts          trigger sync / read sync status + cache size (admin-gated when enabled)
+    reprocess/route.ts     recompute derived fields, no Zotero calls (admin-gated when enabled)
     stats/route.ts         compute comparison stats
     facets/route.ts        tag/author/item-type suggestions, scoped to other active filters
     network/route.ts       compute pairwise query-set overlaps
@@ -413,6 +499,13 @@ app/
     comparisons/[id]/route.ts  delete a history entry
     network-runs/route.ts  list / save network history
     network-runs/[id]/route.ts  delete a network history entry
+    auth/login/route.ts     verify credentials, create a session
+    auth/logout/route.ts    delete the session, clear cookies
+    auth/me/route.ts        { authEnabled, role } for client-side gating
+    users/route.ts          list members / create a member (admin only)
+    users/[id]/route.ts     remove a member (admin only)
+proxy.ts                  renamed from middleware.ts in this Next.js version -
+                           optimistic auth/role redirect (see "Access management")
 lib/
   zotero/client.ts        read-only Zotero API client
   zotero/sync.ts           sync orchestration
@@ -423,9 +516,12 @@ lib/
   citations/apa.ts          APA-style reference formatting
   stats/aggregate.ts        MongoDB aggregation, query-set stats, and facets
   stats/network.ts          pairwise query-set overlap computation
+  auth/session.ts            session cookie verification, the enable flag, admin-check helpers
+  auth/passwords.ts          bcrypt hashing + random password generation
+  auth/bootstrap.ts           creates the first admin from env vars, once
   i18n/                     translations + language context (DE/EN, defaults EN)
   db/mongodb.ts             connection singleton
-  db/models/                 Item, Config, SyncMeta, SavedQuery, ComparisonRun, NetworkRun
+  db/models/                 Item, Config, SyncMeta, SavedQuery, ComparisonRun, NetworkRun, User, Session
 components/                shared UI (Nav, TagInput, ItemTypeFilter, QuerySetEditor,
                             GlobalFilterBar, NetworkGraph, charts, CitationList, ...)
 ```

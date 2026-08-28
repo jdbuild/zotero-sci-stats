@@ -323,10 +323,35 @@ the underlying node/edge data changes, so a stale manual position from a
 previous network never leaks into a new one.
 
 `/network` reuses [`QuerySetEditor.tsx`](components/QuerySetEditor.tsx)
-and [`GlobalFilterBar.tsx`](components/GlobalFilterBar.tsx) unchanged from
-Compare (same tag/author editing, same shared date/type filter) - it only
+and [`GlobalFilterBar.tsx`](components/GlobalFilterBar.tsx) from Compare
+(same tag/author editing, same shared date/type filter) - it only
 diverges at the "submit" step, posting to `/api/network` instead of
-`/api/stats` and rendering the result differently.
+`/api/stats` and rendering the result differently, plus one addition
+described below that only the Network page uses.
+
+**Per-node author attribution.** Each node can optionally declare
+`members` - a roster of names, entered via a new `extra` render-prop slot
+on `QuerySetEditor` (passed a function so it can reuse that node's
+already-fetched, tag-scoped author suggestions instead of re-fetching
+them; Compare doesn't pass this prop, so its rendering is unaffected).
+Unlike the Authors filter, a roster is *purely annotation* - it never
+changes which items belong to a node, only how the overlap gets
+explained afterward. `computeNetwork` fetches each item's `creatorNames`
+and full `creators` array (already stored per item, in Zotero's own
+order with `creatorType`) alongside its key, so no extra query is needed
+per edge. For every pairwise overlap it produces two breakdowns: `contributors`
+(any roster member appearing anywhere in an item's creator list) and
+`originators` (only that item's *first* author - the first `creatorType:
+"author"` entry) - "who's on it" versus "who led it." A name declared on
+both nodes' rosters is labelled `"shared"` rather than attributed to one
+side or double-counted, and items matching neither roster are tallied as
+`untrackedOriginCount` rather than silently dropped, so both breakdowns
+always sum exactly to the edge's total. [`NetworkGraph.tsx`](components/NetworkGraph.tsx)
+renders an edge with attributable origination data as three line
+segments - a source-colored tip, neutral grey middle, target-colored tip,
+sized by each side's share of the total - reusing each node's own
+existing bubble color; an edge with no roster data renders as the single
+plain line it always has.
 
 ### Network history
 

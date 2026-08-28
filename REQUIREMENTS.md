@@ -199,6 +199,40 @@ a pure function of already-fetched key sets. `npm run build` and
 (build doesn't touch the DB at build time - the affected routes are all
 server-rendered on demand).
 
+## Follow-up: per-node author attribution on the Network page
+
+For each network node (a tag/author combination), declare an optional
+roster of "tracked authors" - people known to belong to that node's
+group. Purely an annotation: it never narrows which items count toward
+that node (unlike the existing Authors filter). With a roster declared,
+every pairwise edge shows who's actually behind the overlap.
+
+| Requirement | Status |
+| --- | --- |
+| Declare tracked authors per node, without narrowing the node's own results | ✅ New optional `members` field on each node/query set, a chip input reusing `TagInput`, rendered via a new `extra` slot on `QuerySetEditor` (unused by Tag Compare, so its behavior there is unaffected). Suggestions are the same tag-scoped author list the Authors field already fetches. |
+| Show who's behind a given pairwise overlap - which side (or specific person) contributed | ✅ Each edge's "Contributors" panel: any roster member appearing as a creator on the shared items, tallied per person. |
+| Distinguish who *originated* (first-authored) shared publications, not just who co-authored them - can it work for any tag sets, not just institutes? | ✅ Yes, generic - the mechanism only checks declared names against each item's first author (`creatorType: "author"`, Zotero's own creator order), nothing tag-specific. New "Originated by" panel per edge, computed from the full uncapped overlap (not the 100-item citation-list cap). Untracked/unattributable items are counted explicitly (`untrackedOriginCount`), so the breakdown always sums exactly to the edge's total. |
+| A name declared on both nodes' rosters shouldn't be picked for one side or double-counted | ✅ Labelled `"shared"` explicitly, both in Contributors and Originated-by. |
+| A node with no roster declared shouldn't show a misleading "0" | ✅ Renders as a greyed "not tracked" badge instead, distinct from a real 0. |
+| Show this on the graph itself, bidirectionally | ✅ An edge with attributable origination data renders as three segments - a source-colored tip, a neutral grey middle, target-colored tip - sized by each side's share, reusing each node's own existing color. Edges with no roster data render exactly as before. |
+| At 6-7+ nodes, bubble/edge colors were hard to tell apart | ✅ `CHART_COLORS` grew from 6 to 12 (first 6 unchanged) - at exactly 7 nodes the old palette literally repeated a color. |
+
+**Verification performed**: against real, live library data (not seeded
+test fixtures - the user gave explicit permission to use/modify the real
+database for this round). Confirmed the sum-to-total invariant exactly
+(e.g. 30 shared + 12 target + 4 source + 98 untracked = 144, matching the
+edge's total precisely) across several real institute-tag pairs, the
+"shared" label triggering correctly when a name was declared on both
+rosters, the "not tracked" badge appearing only for a genuinely
+roster-less side, and the rendered SVG edge segments' pixel lengths
+matching the computed fractions exactly (checked via live DOM
+inspection, not just visually). A real bug was caught this round: the
+first version crashed the whole `/network` page on load because older
+saved network runs (from before this feature) lack the new
+`contributors`/`originators` fields - fixed with defensive `?? []`
+fallbacks, and confirmed old saved runs now render their empty state
+gracefully instead of crashing.
+
 ## Open / explicitly deferred
 
 - Automatic sync on app startup (currently manual button only).

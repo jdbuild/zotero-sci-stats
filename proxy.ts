@@ -11,7 +11,7 @@ import { ROLE_COOKIE, SESSION_COOKIE } from "@/lib/auth/session";
 // check is lib/auth/session.ts's verifySession(), called from inside each
 // protected page/route - this file is a first line of defense, not the
 // only one.
-const PUBLIC_PATHS = ["/login", "/api/auth/login"];
+const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/me"];
 
 export function proxy(request: NextRequest) {
   if (process.env.NEXT_PUBLIC_AUTH_ENABLED !== "true") return NextResponse.next();

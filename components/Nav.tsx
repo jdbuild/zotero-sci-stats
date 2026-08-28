@@ -29,15 +29,24 @@ export function Nav() {
     };
   }, [pathname]);
 
-  const showSettings = !auth?.authEnabled || auth.role === "admin";
-  const showLogout = auth?.authEnabled && auth.role;
+  // Before the fetch resolves, auth is null - treat that as "don't know
+  // yet" rather than "disabled", so Settings/Logout don't flash into view
+  // for a moment on every navigation before snapping to the real state.
+  const showSettings = auth !== null && (!auth.authEnabled || auth.role === "admin");
+  const showLogout = Boolean(auth?.authEnabled && auth.role);
 
-  const links = [
-    { href: "/", label: messages.nav.overview },
-    { href: "/compare", label: messages.nav.compare },
-    { href: "/network", label: messages.nav.network },
-    ...(showSettings ? [{ href: "/settings", label: messages.nav.settings }] : []),
-  ];
+  // On the login page itself there's nowhere to navigate to yet - every
+  // other page just bounces back here anyway - so show only the brand and
+  // language switch, not a full menu of links that go nowhere.
+  const onLoginPage = pathname === "/login";
+  const links = onLoginPage
+    ? []
+    : [
+        { href: "/", label: messages.nav.overview },
+        { href: "/compare", label: messages.nav.compare },
+        { href: "/network", label: messages.nav.network },
+        ...(showSettings ? [{ href: "/settings", label: messages.nav.settings }] : []),
+      ];
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });

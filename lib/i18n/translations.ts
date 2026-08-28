@@ -101,7 +101,6 @@ export interface Messages {
     collabRankingHeading: string;
     totalPublicationsColumn: string;
     collaborativeColumn: string;
-    shareOfCollabColumn: string;
     pairRankingHeading: string;
     sharedCount: string;
     noOverlap: string;
@@ -112,12 +111,17 @@ export interface Messages {
     trackedAuthorsLabel: string;
     trackedAuthorsPlaceholder: string;
     trackedAuthorsHint: string;
-    contributorsHeading: string;
-    sharedMemberBadge: string;
-    originatedByHeading: string;
-    noOriginators: string;
     notTracked: string;
-    untrackedOriginCount: string;
+    pointsLabel: string;
+    winsLabel: string;
+    tiesLabel: string;
+    unassignedLabel: string;
+    otherQuerySetLabel: string;
+    method1Heading: string;
+    method1Explainer: string;
+    method2Heading: string;
+    method2Explainer: string;
+    explainerTriggerLabel: string;
   };
   common: {
     unknownError: string;
@@ -244,7 +248,6 @@ export const translations: Record<Language, Messages> = {
       collabRankingHeading: "Rangliste nach Kollaborationen",
       totalPublicationsColumn: "Publikationen gesamt",
       collaborativeColumn: "Kollaborativ",
-      shareOfCollabColumn: "Anteil an allen Kollaborationen",
       pairRankingHeading: "Stärkste Verbindungen",
       sharedCount: "{count} gemeinsame Publikationen",
       noOverlap: "Keine gemeinsamen Publikationen",
@@ -256,12 +259,19 @@ export const translations: Record<Language, Messages> = {
       trackedAuthorsPlaceholder: "Namen eingeben, Enter drücken…",
       trackedAuthorsHint:
         "Schränkt diesen Knoten nicht ein - zeigt nur, wer hinter den unten stehenden Verbindungen steckt.",
-      contributorsHeading: "Beteiligt",
-      sharedMemberBadge: "auf beiden Listen",
-      originatedByHeading: "Erstautor:in",
-      noOriginators: "Keine erfassten Erstautor:innen in diesen Publikationen.",
       notTracked: "nicht erfasst",
-      untrackedOriginCount: "{count} mit nicht erfasster oder unbekannter Erstautor:in",
+      pointsLabel: "Punkte",
+      winsLabel: "zugeschrieben",
+      tiesLabel: "Unentschieden",
+      unassignedLabel: "nicht zuordenbar",
+      otherQuerySetLabel: "von einem anderen erfassten Query-Set initiiert",
+      method1Heading: "Methode 1: Initiator:in",
+      method1Explainer:
+        "Wer zuerst in der Autor:innen-Liste einer gemeinsamen Publikation vorkommt, bekommt die ganze Publikation zugeschrieben - dabei zählen die erfassten Autor:innen aller Query-Sets im Netzwerk, nicht nur der beiden hier verglichenen. Steht die erste erfasste Person auf einem dritten, hier nicht verglichenen Query-Set, wird die Publikation als 'von einem anderen Query-Set initiiert' geführt, statt fälschlich einem der beiden verglichenen Query-Sets zugeschrieben zu werden. Kommt niemand vor, oder ist die erste erfasste Person auf beiden verglichenen Listen zugleich, bleibt sie unzugeordnet.",
+      method2Heading: "Methode 2: Medaillenwertung",
+      method2Explainer:
+        "Jede Position in der Autor:innen-Liste bringt Punkte: Gold für die erste Person, Silber für die zweite oder letzte Person, Bronze für alle dazwischen. Die Punkte zählen für das Query-Set, dem die jeweilige Person angehört; wer mehr Punkte hat, gewinnt diese Publikation.",
+      explainerTriggerLabel: "Wie wird das gezählt?",
     },
     common: {
       unknownError: "Unbekannter Fehler.",
@@ -386,7 +396,6 @@ export const translations: Record<Language, Messages> = {
       collabRankingHeading: "Ranking by collaborations",
       totalPublicationsColumn: "Total publications",
       collaborativeColumn: "Collaborative",
-      shareOfCollabColumn: "Share of all collaboration",
       pairRankingHeading: "Strongest connections",
       sharedCount: "{count} shared publications",
       noOverlap: "No shared publications",
@@ -398,12 +407,19 @@ export const translations: Record<Language, Messages> = {
       trackedAuthorsPlaceholder: "Add a name, press Enter…",
       trackedAuthorsHint:
         "Doesn't narrow this node - only shows who's behind the connections below.",
-      contributorsHeading: "Contributors",
-      sharedMemberBadge: "on both lists",
-      originatedByHeading: "Originated by",
-      noOriginators: "No tracked first authors among these publications.",
       notTracked: "not tracked",
-      untrackedOriginCount: "{count} with an untracked or unlisted first author",
+      pointsLabel: "points",
+      winsLabel: "credited",
+      tiesLabel: "Ties",
+      unassignedLabel: "unassigned",
+      otherQuerySetLabel: "initiated by another tracked query set",
+      method1Heading: "Method 1: Initiator",
+      method1Explainer:
+        "Whoever appears first in a shared publication's author list gets the whole publication credited to them - checked against every tracked query set in the whole network, not just the two being compared here. If that earliest tracked person turns out to belong to a third query set (neither of these two), the publication is marked \"initiated by another tracked query set\" instead of being wrongly credited to whichever of these two happens to appear earlier between themselves. If nobody's tracked at all, or the earliest tracked person is on both compared lists at once, it's left unassigned.",
+      method2Heading: "Method 2: Medal race",
+      method2Explainer:
+        "Every position in the author list earns points: gold for the first author, silver for the second or last author, bronze for everyone in between. The points count toward whichever query set that person belongs to; whoever has more points wins that publication.",
+      explainerTriggerLabel: "How is this counted?",
     },
     common: {
       unknownError: "Unknown error.",

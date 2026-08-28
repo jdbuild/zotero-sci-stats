@@ -336,22 +336,48 @@ already-fetched, tag-scoped author suggestions instead of re-fetching
 them; Compare doesn't pass this prop, so its rendering is unaffected).
 Unlike the Authors filter, a roster is *purely annotation* - it never
 changes which items belong to a node, only how the overlap gets
-explained afterward. `computeNetwork` fetches each item's `creatorNames`
-and full `creators` array (already stored per item, in Zotero's own
-order with `creatorType`) alongside its key, so no extra query is needed
-per edge. For every pairwise overlap it produces two breakdowns: `contributors`
-(any roster member appearing anywhere in an item's creator list) and
-`originators` (only that item's *first* author - the first `creatorType:
-"author"` entry) - "who's on it" versus "who led it." A name declared on
-both nodes' rosters is labelled `"shared"` rather than attributed to one
-side or double-counted, and items matching neither roster are tallied as
-`untrackedOriginCount` rather than silently dropped, so both breakdowns
-always sum exactly to the edge's total. [`NetworkGraph.tsx`](components/NetworkGraph.tsx)
-renders an edge with attributable origination data as three line
-segments - a source-colored tip, neutral grey middle, target-colored tip,
-sized by each side's share of the total - reusing each node's own
-existing bubble color; an edge with no roster data renders as the single
-plain line it always has.
+explained afterward. `computeNetwork` fetches each item's full `creators`
+array (already stored per item, in Zotero's own order with
+`creatorType`) alongside its key, so no extra query is needed per edge;
+`authorNamesInOrder` (`lib/zotero/creators.ts`) filters that down to just
+`creatorType: "author"` entries in byline order, the shared basis for
+both scoring methods below (in progress on the `medal-race` branch, not
+yet merged to `main`).
+
+Two independent methods answer "which institute owns this overlap,"
+computed per edge:
+
+- **Method 1, "Initiator"** (`computeInitiator`): whichever side's
+  earliest tracked byline position wins the whole item, no partial
+  credit. Critically, "earliest tracked" is checked against a
+  **network-wide** roster lookup (`nameToNodeIds`, built once per
+  `computeNetwork` call from *every* node's roster, not just the current
+  pair's) - with 3+ nodes in the network, a publication first-authored by
+  a third, untracked-in-this-edge institute must not get silently
+  misattributed to whichever of the two *compared* institutes merely
+  happens to appear earlier *between themselves*. An item whose true
+  earliest tracked author belongs to neither side is tallied as
+  `otherInstitute` rather than guessed at; one on both compared rosters,
+  or nobody tracked at all, is `unassigned`.
+- **Method 2, "Medal race"** (`computeMedalRace`): every byline position
+  earns a medal by count of authors N - gold (first, 3pts), silver
+  (second or last, 2pts), bronze (everyone strictly between, 1pt). An
+  institute's point total on an item is the sum from its own roster
+  members only (unaffected by who else, from any institute, is elsewhere
+  on the byline - each side's tally is independent, which is why this
+  method doesn't need the network-wide lookup Method 1 does). A name on
+  both compared rosters scores for *both* sides on that item, by explicit
+  design - not excluded, not picked for one.
+
+Both are gated behind `isTracked` (at least one side has a declared
+roster) and rendered via one shared `StatLine` component (`app/network/page.tsx`)
+so the core "name: N credited (P%)" stat reads identically in both
+panels regardless of what extra detail (the medal breakdown) surrounds
+it. [`NetworkGraph.tsx`](components/NetworkGraph.tsx) renders an edge
+with Method 1 data as three line segments - a source-colored tip, neutral
+grey middle, target-colored tip, sized by each side's share of the total
+- reusing each node's own existing bubble color; an edge with no roster
+data renders as the single plain line it always has.
 
 ### Network history
 

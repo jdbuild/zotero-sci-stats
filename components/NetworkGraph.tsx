@@ -193,17 +193,13 @@ export function NetworkGraph({ nodes, edges }: { nodes: NetworkNode[]; edges: Ne
           const midX = (p1.x + p2.x) / 2;
           const midY = (p1.y + p2.y) / 2;
 
-          // Split the line into "originated by source" / neutral /
-          // "originated by target" segments when at least one side has a
-          // clean, unambiguous (non-"shared") first-author claim. Items
+          // Split the line into "initiated by source" / neutral /
+          // "initiated by target" segments (Method 1's per-item winner)
+          // when at least one side has a clean, unambiguous claim. Items
           // with no roster data at all keep the plain single-color line -
           // zero visual change for anyone not using tracked authors.
-          const sourceOriginCount = (e.originators ?? [])
-            .filter((o) => o.side === "source")
-            .reduce((sum, o) => sum + o.count, 0);
-          const targetOriginCount = (e.originators ?? [])
-            .filter((o) => o.side === "target")
-            .reduce((sum, o) => sum + o.count, 0);
+          const sourceOriginCount = e.initiator?.sourceWins ?? 0;
+          const targetOriginCount = e.initiator?.targetWins ?? 0;
           const fracSource = e.count > 0 ? sourceOriginCount / e.count : 0;
           const fracTarget = e.count > 0 ? targetOriginCount / e.count : 0;
           const showSplit = fracSource > 0 || fracTarget > 0;

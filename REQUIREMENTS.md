@@ -233,6 +233,65 @@ saved network runs (from before this feature) lack the new
 fallbacks, and confirmed old saved runs now render their empty state
 gracefully instead of crashing.
 
+## Follow-up: two "who owns this collaboration" scoring methods (branch `medal-race`)
+
+Built on a separate `medal-race` branch (not yet merged to `main`) so it
+could be tried against real data before committing to it - see the
+branch-vs-page-placement discussion that opened this round. Reuses the
+same per-node `members` roster from [[project_network_author_attribution]]
+unchanged; adds two independent ways of asking "which institute owns a
+shared publication," replacing the earlier "Contributors"/"Originated by"
+panels entirely (removed - "no use of this data" once these existed).
+
+| Requirement | Status |
+| --- | --- |
+| **Method 1, "Initiator"**: whichever side's earliest tracked byline position wins the whole publication, no partial credit | ✅ `computeInitiator` in `lib/stats/network.ts`. A name declared on both compared institutes' rosters, or nobody tracked at all, is left unassigned rather than guessed at. |
+| **Method 2, "Medal race"**: byline position earns gold (first author, 3pts) / silver (second-or-last author, 2pts) / bronze (everyone else, 1pt); an institute's total is the sum from its own roster members; higher total wins that publication | ✅ `computeMedalRace`. A name declared on both rosters scores for both sides on that item (explicit user decision - not excluded, not picked for one side). UI shows 🥇/🥈/🥉 counts plus point totals per side, not just a single number. |
+| Both methods need a plain-language explanation in the UI, not just numbers | ✅ A native `<details>`/`<summary>` "(i)" disclosure next to each method's heading - works identically on touch and desktop, no JS state needed. |
+| "Wins" read too competitive/aggressive | ✅ Reworded to "credited" (both languages), and every count (credited, ties, unassigned) now shows a percentage of the edge's total, using one shared `StatLine` component so the core stat looks visually identical in both panels regardless of what extra detail (medal breakdown) surrounds it in Method 2. |
+| At 6-7+ nodes, bubble/edge colors were hard to tell apart | ✅ `CHART_COLORS` grew from 6 to 12 (first 6 unchanged). |
+
+### Bug fix: Method 1 ignored third institutes with 3+ nodes in the network
+
+A real correctness bug, only visible once comparing more than two
+institutes at once. `computeInitiator` originally scoped its "who's
+earliest" check to only the *current pair's* two rosters - so for a
+publication first-authored by institute C (untracked by this edge), with
+institute A's tracked member appearing before institute B's tracked
+member later in the same byline, the A×B edge would credit A, even
+though neither A nor B actually initiated it - C did, and C was never
+even checked because it isn't part of that specific pairwise comparison.
+
+Medal race was never affected: it sums each institute's own roster
+members' points independently, regardless of who else (from any
+institute) is elsewhere on the byline - a third institute's presence
+doesn't corrupt either side's own tally.
+
+**Fix**: `computeInitiator` now takes a network-wide `nameToNodeIds` map
+(built once per `computeNetwork` call, from every node's roster, not
+just the current pair's) instead of two local rosters. For each item, it
+finds the byline's *true* earliest tracked author across every node in
+the network, then classifies: source-only -> source; target-only ->
+target; declared on both compared rosters -> unassigned (as before);
+**declared on some other node's roster (neither source nor target) ->
+new `otherInstitute` category**, shown in the UI as "initiated by
+another tracked institute."
+
+**Verification**: built the same CDHSI x ICMT pair twice against real
+data - once in a 2-node network (just CDHSI + ICMT), once in a 3-node
+network with IGW added. Total overlap count was identical (14) in both,
+but one item moved from ICMT's count to the new `otherInstitute` bucket
+once IGW was checked - proving the bug was real and the fix corrects it
+without losing or double-counting anything. Sum invariant
+(sourceWins + targetWins + unassigned + otherInstitute = edge count)
+verified exactly across every edge of a live 7-institute network build,
+not just the one pair.
+
+**Not computationally complex**: no new database queries or fetched
+fields - rosters are small, human-curated lists, and the network-wide
+lookup is built once and reused across every edge, rather than rebuilt
+per-pair as before.
+
 ## Open / explicitly deferred
 
 - Automatic sync on app startup (currently manual button only).

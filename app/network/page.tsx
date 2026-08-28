@@ -16,6 +16,96 @@ function pct(count: number, total: number): string {
   return `${Math.round((count / total) * 100)}%`;
 }
 
+/** The one reusable "name: count (pct)" stat, used identically in both
+ * scoring panels so a reader recognizes it's the same kind of number in
+ * each place, regardless of what other detail surrounds it. When
+ * `breakdown` is given, the whole line becomes a click-to-reveal
+ * disclosure showing exactly who's behind the count. */
+function StatLine({
+  name,
+  count,
+  total,
+  suffix,
+  breakdown,
+}: {
+  name: string;
+  count: number;
+  total: number;
+  suffix: string;
+  breakdown?: { label: string; count: number }[];
+}) {
+  const line = (
+    <div className="flex items-baseline gap-1.5">
+      <span className="font-medium">{name}:</span>
+      <span className="font-semibold">{count}</span>
+      <span className="text-zinc-500 dark:text-zinc-400">{suffix}</span>
+      <span className="text-zinc-400">({pct(count, total)})</span>
+    </div>
+  );
+
+  if (!breakdown || breakdown.length === 0) return line;
+
+  return (
+    <details className="group">
+      <summary className="flex cursor-pointer list-none items-center gap-1 rounded px-1 -mx-1 text-blue-600 hover:bg-blue-50 hover:underline [&::-webkit-details-marker]:hidden dark:text-blue-400 dark:hover:bg-blue-950/40">
+        {line}
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-blue-500 transition-transform group-open:rotate-180 dark:text-blue-400" />
+      </summary>
+      <div className="mt-1 flex flex-wrap gap-1.5">
+        {breakdown.map((b) => (
+          <span key={b.label} className="rounded bg-zinc-100 px-2 py-0.5 text-xs dark:bg-zinc-800">
+            {b.label} ({b.count})
+          </span>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+/** A small "(i)" disclosure - click to reveal a plain-language explanation
+ * inline, no hover/JS-state needed (native <details>, works the same on touch). */
+function ExplainerInfo({ text, label }: { text: string; label: string }) {
+  return (
+    <details className="text-xs">
+      <summary
+        aria-label={label}
+        className="inline-flex h-4 w-4 cursor-pointer list-none items-center justify-center rounded-full border border-zinc-300 text-[10px] text-zinc-500 hover:bg-zinc-100 [&::-webkit-details-marker]:hidden dark:border-zinc-600 dark:text-zinc-400 dark:hover:bg-zinc-800"
+      >
+        i
+      </summary>
+      <p className="mt-1 max-w-sm font-normal text-zinc-500 dark:text-zinc-400">{text}</p>
+    </details>
+  );
+}
+
+/** Click-to-reveal breakdown of names behind a count (e.g. "unassigned: 7")
+ * - who's actually showing up untracked, so it's obvious who'd be worth
+ * adding to a roster. Reuses the same <details> pattern as ExplainerInfo. */
+function BreakdownDisclosure({
+  triggerLabel,
+  items,
+}: {
+  triggerLabel: string;
+  items: { label: string; count: number }[];
+}) {
+  if (items.length === 0) return null;
+  return (
+    <details className="group inline-block">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded px-1 -mx-1 text-blue-600 hover:bg-blue-50 hover:underline [&::-webkit-details-marker]:hidden dark:text-blue-400 dark:hover:bg-blue-950/40">
+        {triggerLabel}
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="mt-1 flex flex-wrap gap-1.5">
+        {items.map((it) => (
+          <span key={it.label} className="rounded bg-zinc-100 px-2 py-0.5 text-xs dark:bg-zinc-800">
+            {it.label} ({it.count})
+          </span>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 /** A network node's editor state, plus its attribution roster (annotation
  * only - never narrows which items belong to this node). */
 interface EditableNode extends EditableQuerySet {
@@ -47,7 +137,7 @@ interface NetworkRunEntry {
 }
 
 /** Whether a node declared any tracked authors at all - distinguishes "0
- * because untracked" from "0 despite being tracked" in the origination display. */
+ * because untracked" from "0 despite being tracked" in the scoring panels. */
 function isTracked(querySets: StoredQuerySet[], nodeId: string): boolean {
   return (querySets.find((q) => q.id === nodeId)?.members?.length ?? 0) > 0;
 }
@@ -90,7 +180,6 @@ function NetworkResults({
                 <th className="py-2 pr-4">{tc.querySetColumn}</th>
                 <th className="py-2 pr-4">{t.totalPublicationsColumn}</th>
                 <th className="py-2 pr-4">{t.collaborativeColumn}</th>
-                <th className="py-2 pr-4">{t.shareOfCollabColumn}</th>
               </tr>
             </thead>
             <tbody>
@@ -105,16 +194,13 @@ function NetworkResults({
                       />
                       {r.node.name}
                     </td>
-                    <td className="py-2 pr-4">{r.node.total}</td>
-                    <td className="py-2 pr-4 text-zinc-600 dark:text-zinc-400">
-                      {r.collabTotal}{" "}
+                    <td className="py-2 pr-4">
+                      {r.node.total}{" "}
                       <span className="text-xs text-zinc-400 dark:text-zinc-500">
-                        ({pct(r.collabTotal, r.node.total)})
+                        ({pct(r.collabTotal, totalCollab)})
                       </span>
                     </td>
-                    <td className="py-2 pr-4 text-zinc-600 dark:text-zinc-400">
-                      {pct(r.collabTotal, totalCollab)}
-                    </td>
+                    <td className="py-2 pr-4 text-zinc-600 dark:text-zinc-400">{r.collabTotal}</td>
                   </tr>
                 );
               })}
@@ -122,14 +208,10 @@ function NetworkResults({
             <tfoot>
               <tr className="border-t-2 border-zinc-300 font-medium dark:border-zinc-700">
                 <td className="py-2 pr-4">{tc.totalRowLabel}</td>
-                <td className="py-2 pr-4">{totalPublications}</td>
-                <td className="py-2 pr-4 text-zinc-600 dark:text-zinc-400">
-                  {totalCollab}{" "}
-                  <span className="text-xs text-zinc-400 dark:text-zinc-500">
-                    ({pct(totalCollab, totalPublications)})
-                  </span>
+                <td className="py-2 pr-4">
+                  {totalPublications} <span className="text-xs text-zinc-400 dark:text-zinc-500">(100%)</span>
                 </td>
-                <td className="py-2 pr-4 text-zinc-600 dark:text-zinc-400">100%</td>
+                <td className="py-2 pr-4 text-zinc-600 dark:text-zinc-400">{totalCollab}</td>
               </tr>
             </tfoot>
           </table>
@@ -153,40 +235,27 @@ function NetworkResults({
                     itemsTruncated: e.itemsTruncated,
                   }}
                 />
-                {(e.contributors ?? []).length > 0 && (
+                {e.initiator && (isTracked(querySets, e.sourceId) || isTracked(querySets, e.targetId)) && (
                   <div className="mt-3 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-                    <p className="mb-1.5 text-xs font-medium text-zinc-500">{t.contributorsHeading}</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {(e.contributors ?? []).map((c) => (
-                        <span
-                          key={c.name}
-                          className="rounded bg-zinc-100 px-2 py-0.5 text-xs dark:bg-zinc-800"
-                        >
-                          {c.name} ({c.count})
-                          {c.side === "shared" && (
-                            <span className="ml-1 text-zinc-400">· {t.sharedMemberBadge}</span>
-                          )}
-                        </span>
-                      ))}
+                    <div className="mb-1.5 flex items-center gap-1.5">
+                      <p className="text-xs font-medium text-zinc-500">{t.method1Heading}</p>
+                      <ExplainerInfo text={t.method1Explainer} label={t.explainerTriggerLabel} />
                     </div>
-                  </div>
-                )}
-                {(isTracked(querySets, e.sourceId) || isTracked(querySets, e.targetId)) && (
-                  <div className="mt-3 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-                    <p className="mb-1.5 text-xs font-medium text-zinc-500">{t.originatedByHeading}</p>
-                    <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                      {(e.originators ?? []).length === 0 ? (
-                        <span className="text-zinc-400">{t.noOriginators}</span>
-                      ) : (
-                        (e.originators ?? []).map((o) => (
-                          <span key={o.name} className="rounded bg-zinc-100 px-2 py-0.5 dark:bg-zinc-800">
-                            {o.name} ({o.count})
-                            {o.side === "shared" && (
-                              <span className="ml-1 text-zinc-400">· {t.sharedMemberBadge}</span>
-                            )}
-                          </span>
-                        ))
-                      )}
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs">
+                      <StatLine
+                        name={e.sourceName}
+                        count={e.initiator.sourceWins}
+                        total={e.count}
+                        suffix={t.winsLabel}
+                        breakdown={(e.initiator.sourceCredited ?? []).map((c) => ({ label: c.name, count: c.count }))}
+                      />
+                      <StatLine
+                        name={e.targetName}
+                        count={e.initiator.targetWins}
+                        total={e.count}
+                        suffix={t.winsLabel}
+                        breakdown={(e.initiator.targetCredited ?? []).map((c) => ({ label: c.name, count: c.count }))}
+                      />
                       {!isTracked(querySets, e.sourceId) && (
                         <span className="rounded border border-dashed border-zinc-300 px-2 py-0.5 text-zinc-400 dark:border-zinc-700">
                           {e.sourceName}: {t.notTracked}
@@ -197,9 +266,98 @@ function NetworkResults({
                           {e.targetName}: {t.notTracked}
                         </span>
                       )}
-                      {(e.untrackedOriginCount ?? 0) > 0 && (
-                        <span className="text-zinc-400">
-                          {t.untrackedOriginCount.replace("{count}", String(e.untrackedOriginCount))}
+                      {(e.initiator.otherQuerySet ?? 0) > 0 && (
+                        <BreakdownDisclosure
+                          triggerLabel={`${t.otherQuerySetLabel}: ${e.initiator.otherQuerySet} (${pct(e.initiator.otherQuerySet, e.count)})`}
+                          items={(e.initiator.otherQuerySetBreakdown ?? []).map((o) => ({
+                            label: `${o.nodeName}: ${o.name}`,
+                            count: o.count,
+                          }))}
+                        />
+                      )}
+                      {e.initiator.unassigned > 0 && (
+                        <BreakdownDisclosure
+                          triggerLabel={`${t.unassignedLabel}: ${e.initiator.unassigned} (${pct(e.initiator.unassigned, e.count)})`}
+                          items={(e.initiator.unassignedFirstAuthors ?? []).map((a) => ({
+                            label: a.name,
+                            count: a.count,
+                          }))}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+                {e.medalRace && (isTracked(querySets, e.sourceId) || isTracked(querySets, e.targetId)) && (
+                  <div className="mt-3 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+                    <div className="mb-1.5 flex items-center gap-1.5">
+                      <p className="text-xs font-medium text-zinc-500">{t.method2Heading}</p>
+                      <ExplainerInfo text={t.method2Explainer} label={t.explainerTriggerLabel} />
+                    </div>
+                    <div className="flex flex-wrap items-start gap-x-6 gap-y-2 text-xs">
+                      <div>
+                        <StatLine
+                          name={e.sourceName}
+                          count={e.medalRace.sourceWins}
+                          total={e.count}
+                          suffix={t.winsLabel}
+                          breakdown={(e.medalRace.sourceMedalists ?? []).map((m) => ({
+                            label: `${m.name} 🥇${m.gold} 🥈${m.silver} 🥉${m.bronze}`,
+                            count: m.points,
+                          }))}
+                        />
+                        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-zinc-500 dark:text-zinc-400">
+                          <span>🥇 {e.medalRace.sourceGold ?? 0}</span>
+                          <span>🥈 {e.medalRace.sourceSilver ?? 0}</span>
+                          <span>🥉 {e.medalRace.sourceBronze ?? 0}</span>
+                          <span className="text-zinc-400">
+                            · {e.medalRace.sourcePoints} {t.pointsLabel}
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <StatLine
+                          name={e.targetName}
+                          count={e.medalRace.targetWins}
+                          total={e.count}
+                          suffix={t.winsLabel}
+                          breakdown={(e.medalRace.targetMedalists ?? []).map((m) => ({
+                            label: `${m.name} 🥇${m.gold} 🥈${m.silver} 🥉${m.bronze}`,
+                            count: m.points,
+                          }))}
+                        />
+                        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-zinc-500 dark:text-zinc-400">
+                          <span>🥇 {e.medalRace.targetGold ?? 0}</span>
+                          <span>🥈 {e.medalRace.targetSilver ?? 0}</span>
+                          <span>🥉 {e.medalRace.targetBronze ?? 0}</span>
+                          <span className="text-zinc-400">
+                            · {e.medalRace.targetPoints} {t.pointsLabel}
+                          </span>
+                        </div>
+                      </div>
+                      {!isTracked(querySets, e.sourceId) && (
+                        <span className="self-start rounded border border-dashed border-zinc-300 px-2 py-0.5 text-zinc-400 dark:border-zinc-700">
+                          {e.sourceName}: {t.notTracked}
+                        </span>
+                      )}
+                      {!isTracked(querySets, e.targetId) && (
+                        <span className="self-start rounded border border-dashed border-zinc-300 px-2 py-0.5 text-zinc-400 dark:border-zinc-700">
+                          {e.targetName}: {t.notTracked}
+                        </span>
+                      )}
+                      {e.medalRace.ties > 0 && (
+                        <span className="self-start text-zinc-400">
+                          {t.tiesLabel}: {e.medalRace.ties} ({pct(e.medalRace.ties, e.count)})
+                        </span>
+                      )}
+                      {e.medalRace.unassigned > 0 && (
+                        <span className="self-start">
+                          <BreakdownDisclosure
+                            triggerLabel={`${t.unassignedLabel}: ${e.medalRace.unassigned} (${pct(e.medalRace.unassigned, e.count)})`}
+                            items={(e.medalRace.unassignedFirstAuthors ?? []).map((a) => ({
+                              label: a.name,
+                              count: a.count,
+                            }))}
+                          />
                         </span>
                       )}
                     </div>

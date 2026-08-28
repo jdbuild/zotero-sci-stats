@@ -337,24 +337,55 @@ Given once the access-management flag was actually turned on for real
 | Remove the "Connect library" / "Go to Compare" buttons from the landing page - not needed anymore | ✅ Removed from `app/page.tsx`, plus the now-unused `home.connectLibrary`/`home.goToCompare` translation keys. |
 | Each user should have their own Tag Compare / Tag NetworkVis history, not one shared list | ✅ New optional `userId` field on `ComparisonRun`/`NetworkRun` (`lib/db/models/`). A shared `getOwnerFilter()` helper (`lib/auth/session.ts`) returns `{ userId }` when access management is on and the caller is authenticated, or `{}` when it's off - spread directly into every Mongo query/`.create()` call in `/api/comparisons*` and `/api/network-runs*`, so history is per-user when the feature is on and library-wide (exactly as before) when it's off. Delete is also owner-scoped, so one member can't delete another's saved run by guessing its id. |
 | Assign the existing (pre-feature) comparison/network runs to the admin account | ✅ One-time migration: all 20 pre-existing `comparisonruns` and 20 `networkruns` (every one of them - the feature didn't exist before, so none had an owner) were assigned to the admin's user id directly in MongoDB. |
-| New members should land on something instead of an empty history - a demo Tag Compare (CDHSI vs. IGW) and a demo network with all the institutes/filters (the most recent real network run), auto-injected when the account is created | ✅ `lib/auth/seedDemoRuns.ts`'s `seedDemoRunsForUser()`, called from `POST /api/users` right after the account is created. Computes a real CDHSI/IGW comparison (`computeQuerySetStats`, same function `/api/stats` uses) and copies whatever the single most recent `NetworkRun` for the library is (independent copy, not a shared reference - deleting one never affects the other). Best-effort: wrapped in try/catch so a seeding hiccup never blocks member creation itself; silently produces fewer/no demo runs if the library isn't configured yet or no network has ever been built. |
+| New members should land on something instead of an empty history - a demo Tag Compare (CDHSI vs. IGW) and a demo network with all the institutes/filters (the most recent real network run), auto-injected when the account is created | ✅ `lib/auth/seedDemoRuns.ts`'s `seedDemoRunsForUser()`, called from `POST /api/users` right after the account is created. Computes a real comparison (`computeQuerySetStats`, same function `/api/stats` uses) and copies whatever the single most recent `NetworkRun` for the library is (independent copy, not a shared reference - deleting one never affects the other). Best-effort: wrapped in try/catch so a seeding hiccup never blocks member creation itself; silently produces fewer/no demo runs if the library isn't configured yet or no network has ever been built. |
+| Demo comparison should read "CDHSI"/"IGW" but scoped to 2025, filtering on the actual full institute names, not the short tags | ✅ Two real, distinct tags exist per institute at very different scales - `CDHSI` (4 items) / `Center for Digital Health and Social Innovation` (199 items), `IGW` (7 items) / `Institut für Gesundheitswissenschaften` (988 items). Verified against real tag data (not assumed) before implementing. The demo now filters on the full-name tags (`Center for Digital Health and Social Innovation`, `Institut für Gesundheitswissenschaften`) with `dateFrom`/`dateTo` set to `2025-01-01`/`2025-12-31`, labeled with the short "CDHSI"/"IGW" names - initially built the other way around (short tag, full name as label) and corrected once caught. |
 | Must keep working exactly as before when there's no access management at all (flag off, zero users) | ✅ Explicit design constraint, not an afterthought - `getOwnerFilter()` returning `{}` when the flag is off means none of this touches the unscoped/global behavior. Confirmed live: with the flag turned off, `/api/comparisons` and `/api/network-runs` still return the full, unscoped 20/20 history, and `/settings` remains reachable with no login prompt - byte-for-byte the pre-existing behavior. |
 
-**Verification performed**: build + lint pass. Live-tested against the
-real database (this round touched real, already-migrated history, not
-an isolated copy - same as the medal-race round's live-data testing):
-confirmed the admin sees all 20+20 migrated runs; created a real test
-member and confirmed they see *exactly* 2 runs (their own seeded demo
-comparison and network), not the admin's; confirmed the demo
-comparison's stats are real, non-placeholder numbers (CDHSI: 4, IGW: 7);
+**Verification performed**: build + lint pass on every change in this
+round. Live-tested against the real database each time (this round
+touched real, already-migrated history, not an isolated copy - same as
+the medal-race round's live-data testing): confirmed the admin sees all
+20+20 migrated runs; created real test member accounts and confirmed
+each sees *exactly* 2 runs (their own seeded demo comparison and
+network), not the admin's or another member's; confirmed the final demo
+comparison's stats are real, substantial 2025 numbers (CDHSI: 45, IGW:
+72 - not the near-empty 4/7 the initial, wrong-tag version produced);
 confirmed the demo network run is an independent copy of the last real
 7-institute network. Then confirmed the flag-off path separately:
 temporarily commented out `NEXT_PUBLIC_AUTH_ENABLED` and restarted,
 confirmed `/api/auth/me` reports `authEnabled: false`, `/api/comparisons`
 and `/api/network-runs` return the full unscoped 20/20 with no login
 required, and `/settings` loads directly - then restored the flag and
-confirmed the admin login still works. Test member account and its two
+confirmed the admin login still works. Every test member account and its
 seeded demo runs were removed afterward.
+
+## Bug fix: the login page showed the full nav, including Settings
+
+Noticed by the user right after the previous round shipped: an
+unauthenticated visitor landing on `/login` saw every nav link -
+Overview, Tag Compare, Tag NetworkVis, even Settings - instead of just
+the login form.
+
+**Root cause**: `proxy.ts`'s `PUBLIC_PATHS` list didn't include
+`/api/auth/me` - the endpoint `Nav.tsx` calls to decide what to show. So
+on `/login`, with no session cookie yet, the proxy blocked that fetch
+with a `401` before the route ever ran. `Nav.tsx` didn't check for that
+failure and just parsed the `401`'s JSON body (`{ error: "..." }`) as if
+it were `{ authEnabled, role }`, then fell back to its existing
+"authEnabled is falsy → show everything" logic - showing the full menu
+to someone who wasn't even logged in.
+
+| Fix | Status |
+| --- | --- |
+| `/api/auth/me` must be callable with no session | ✅ Added to `proxy.ts`'s `PUBLIC_PATHS`, alongside `/login` and `/api/auth/login`. |
+| Nav shouldn't default to "show everything" while the real auth state is still unknown (a fetch in flight, or any other failure) | ✅ `showSettings`/`showLogout` in `Nav.tsx` now require `auth !== null` (a resolved response) before showing anything gated - closes the same class of bug even if a future failure mode reintroduces it. |
+| The login page itself has nowhere to navigate to - showing page links there was pointless even before the bug | ✅ `Nav.tsx` renders zero page links (just the brand + language switch) whenever `pathname === "/login"`. |
+
+**Verification performed**: build + lint pass. Live-tested: logged out,
+confirmed `/login` shows only the brand/logo and language switch - no
+Overview/Compare/Network/Settings/Logout; logged back in as admin and
+confirmed the full nav (including Settings and Logout) still renders
+correctly, no regression.
 
 ## Open / explicitly deferred
 
@@ -366,6 +397,14 @@ seeded demo runs were removed afterward.
   now simply inaccessible (owned by a user id that no longer exists) -
   harmless but not actively cleaned up; flag if that should cascade-delete
   instead.
+- No in-app way to change a password after the fact - not the admin's own,
+  not another member's. `ADMIN_PASSWORD` in `.env.local` only takes effect
+  once, the very first time the admin account is bootstrapped
+  (`ensureBootstrapAdmin()` is a no-op once an admin already exists), so
+  editing it later has no effect on the real, already-stored password
+  hash. The only current workaround is deleting the account's `users`
+  document directly in MongoDB and letting it re-bootstrap (admin) or
+  re-creating the member from Settings (gets a new generated password).
 - Multi-user / login support for the *default*, local/internal use case -
   still intentionally off unless `NEXT_PUBLIC_AUTH_ENABLED` is explicitly
   set, per the original "single-user, local only" decision; see the

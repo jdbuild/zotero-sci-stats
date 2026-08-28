@@ -48,7 +48,7 @@ This is enforced at two independent layers:
 | `configs`   | Singleton: the connected library (API key, library id/type/name).       |
 | `items`     | One document per Zotero item — the sync cache. See [`Item.ts`](lib/db/models/Item.ts). |
 | `syncmetas` | One document per library: last synced Zotero library version, status, item count, last-run duration/bytes/added/updated/deleted. |
-| `comparisonruns` | History of comparisons run on the Compare page (the query sets used + the computed stats), newest 20 per library. Lets past comparisons stay on the page across reloads. |
+| `comparisonruns` | History of comparisons run on the Compare page (the query sets used + the computed stats), newest 20 per library (and per user, once access management is on — see [§ Access management](#access-management)). Lets past comparisons stay on the page across reloads. |
 | `savedquerys` | Reusable named query sets (tags, tag mode, year range). Not required for the UI to work — the Compare page also works with ad-hoc, unsaved query sets. |
 | `users` | Only populated when access management is enabled (see below): `username`, `passwordHash` (bcrypt), `role` (`admin`/`member`). |
 | `sessions` | Opaque session tokens, only populated when access management is enabled: `token`, `userId`, `role`, `expiresAt` — a MongoDB TTL index (`expireAfterSeconds: 0` on `expiresAt`) deletes expired sessions automatically. |
@@ -478,6 +478,44 @@ it, and returns the **plaintext exactly once** in the response body —
 that response is the only place it ever exists outside the admin's own
 clipboard; it is never logged or stored.
 
+### Per-user comparison/network history
+
+`ComparisonRun` and `NetworkRun` both carry an optional `userId`. A
+single shared helper, `getOwnerFilter()` (`lib/auth/session.ts`), decides
+how every read/write in `/api/comparisons*` and `/api/network-runs*`
+gets scoped:
+
+```ts
+export async function getOwnerFilter(): Promise<{ userId?: string } | null> {
+  if (!isAuthEnabled()) return {};
+  const session = await getCurrentSession();
+  return session ? { userId: session.userId } : null;
+}
+```
+
+`{}` (access management off) spreads into a Mongo query or `.create()`
+call as a no-op — history stays library-wide, exactly as it was before
+this feature existed. `{ userId }` (access management on) scopes every
+list/create/delete to the caller's own runs — one member never sees or
+can delete another's saved comparisons or networks. `null` means "on,
+but not actually authenticated," which every route turns into a `401`.
+This mirrors the `isAdminOrAuthDisabled()`/`requireAdmin()` pattern
+above: one flag, one behavior fork, checked at the point of use rather
+than threaded through as page-level conditionals.
+
+New members are seeded with two saved runs instead of an empty history
+([`lib/auth/seedDemoRuns.ts`](lib/auth/seedDemoRuns.ts), called right
+after `POST /api/users` creates the account): a real CDHSI-vs-IGW Tag
+Compare (computed via the same `computeQuerySetStats` `/api/stats`
+uses, not a placeholder), and an independent copy of whichever
+`NetworkRun` is currently the most recent for the library — not scoped
+to any particular owner, so it's whatever institutes/filters were last
+actually built, typically the fullest one. The copy is a fully separate
+document; deleting either one never touches the other. Seeding is
+best-effort and wrapped in try/catch by the caller — a library that
+isn't configured yet, or has no network run yet, just means fewer demo
+runs, never a failed member creation.
+
 ## Project structure
 
 ```
@@ -519,6 +557,7 @@ lib/
   auth/session.ts            session cookie verification, the enable flag, admin-check helpers
   auth/passwords.ts          bcrypt hashing + random password generation
   auth/bootstrap.ts           creates the first admin from env vars, once
+  auth/seedDemoRuns.ts         demo comparison/network run for a new member
   i18n/                     translations + language context (DE/EN, defaults EN)
   db/mongodb.ts             connection singleton
   db/models/                 Item, Config, SyncMeta, SavedQuery, ComparisonRun, NetworkRun, User, Session

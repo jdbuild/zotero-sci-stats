@@ -327,11 +327,45 @@ it that option, logout clearing the session, and the admin regaining
 full access including the Access management table afterward. Test
 accounts were removed and `.env.local` restored before finishing.
 
+## Follow-up: per-user history, landing page cleanup, demo runs for new members
+
+Given once the access-management flag was actually turned on for real
+(against the live database, admin logged in) and used hands-on.
+
+| Requirement | Status |
+| --- | --- |
+| Remove the "Connect library" / "Go to Compare" buttons from the landing page - not needed anymore | ✅ Removed from `app/page.tsx`, plus the now-unused `home.connectLibrary`/`home.goToCompare` translation keys. |
+| Each user should have their own Tag Compare / Tag NetworkVis history, not one shared list | ✅ New optional `userId` field on `ComparisonRun`/`NetworkRun` (`lib/db/models/`). A shared `getOwnerFilter()` helper (`lib/auth/session.ts`) returns `{ userId }` when access management is on and the caller is authenticated, or `{}` when it's off - spread directly into every Mongo query/`.create()` call in `/api/comparisons*` and `/api/network-runs*`, so history is per-user when the feature is on and library-wide (exactly as before) when it's off. Delete is also owner-scoped, so one member can't delete another's saved run by guessing its id. |
+| Assign the existing (pre-feature) comparison/network runs to the admin account | ✅ One-time migration: all 20 pre-existing `comparisonruns` and 20 `networkruns` (every one of them - the feature didn't exist before, so none had an owner) were assigned to the admin's user id directly in MongoDB. |
+| New members should land on something instead of an empty history - a demo Tag Compare (CDHSI vs. IGW) and a demo network with all the institutes/filters (the most recent real network run), auto-injected when the account is created | ✅ `lib/auth/seedDemoRuns.ts`'s `seedDemoRunsForUser()`, called from `POST /api/users` right after the account is created. Computes a real CDHSI/IGW comparison (`computeQuerySetStats`, same function `/api/stats` uses) and copies whatever the single most recent `NetworkRun` for the library is (independent copy, not a shared reference - deleting one never affects the other). Best-effort: wrapped in try/catch so a seeding hiccup never blocks member creation itself; silently produces fewer/no demo runs if the library isn't configured yet or no network has ever been built. |
+| Must keep working exactly as before when there's no access management at all (flag off, zero users) | ✅ Explicit design constraint, not an afterthought - `getOwnerFilter()` returning `{}` when the flag is off means none of this touches the unscoped/global behavior. Confirmed live: with the flag turned off, `/api/comparisons` and `/api/network-runs` still return the full, unscoped 20/20 history, and `/settings` remains reachable with no login prompt - byte-for-byte the pre-existing behavior. |
+
+**Verification performed**: build + lint pass. Live-tested against the
+real database (this round touched real, already-migrated history, not
+an isolated copy - same as the medal-race round's live-data testing):
+confirmed the admin sees all 20+20 migrated runs; created a real test
+member and confirmed they see *exactly* 2 runs (their own seeded demo
+comparison and network), not the admin's; confirmed the demo
+comparison's stats are real, non-placeholder numbers (CDHSI: 4, IGW: 7);
+confirmed the demo network run is an independent copy of the last real
+7-institute network. Then confirmed the flag-off path separately:
+temporarily commented out `NEXT_PUBLIC_AUTH_ENABLED` and restarted,
+confirmed `/api/auth/me` reports `authEnabled: false`, `/api/comparisons`
+and `/api/network-runs` return the full unscoped 20/20 with no login
+required, and `/settings` loads directly - then restored the flag and
+confirmed the admin login still works. Test member account and its two
+seeded demo runs were removed afterward.
+
 ## Open / explicitly deferred
 
 - Automatic sync on app startup (currently manual button only).
 - Reloading/saving named query sets via the `savedquerys` collection in
   the Compare UI (model exists, UI wiring doesn't).
+- Deleting a member (Settings → Access management) removes their account
+  and sessions but leaves their saved comparison/network runs in place,
+  now simply inaccessible (owned by a user id that no longer exists) -
+  harmless but not actively cleaned up; flag if that should cascade-delete
+  instead.
 - Multi-user / login support for the *default*, local/internal use case -
   still intentionally off unless `NEXT_PUBLIC_AUTH_ENABLED` is explicitly
   set, per the original "single-user, local only" decision; see the

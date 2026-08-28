@@ -67,6 +67,18 @@ export async function requireAdmin(): Promise<VerifiedSession | null> {
   return session?.role === "admin" ? session : null;
 }
 
+/** For per-user-scoped resources (comparison/network run history). `null`
+ * means "not authorized" - access management is on but there's no valid
+ * session, so the caller should 401. `{}` means "don't scope by owner at
+ * all" - either access management is off (today's library-wide history,
+ * unchanged), spread this directly into a Mongo filter (adds nothing) or
+ * a `.create()` call (sets no `userId`) either way. */
+export async function getOwnerFilter(): Promise<{ userId?: string } | null> {
+  if (!isAuthEnabled()) return {};
+  const session = await getCurrentSession();
+  return session ? { userId: session.userId } : null;
+}
+
 /** For core app routes (Zotero connection, sync, reprocess) that must keep
  * working unchanged on deployments that don't use access management at
  * all - only gates to admin once the feature is actually switched on. */

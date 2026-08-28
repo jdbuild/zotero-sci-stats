@@ -8,6 +8,11 @@ const ComparisonRunSchema = new Schema(
     libraryId: { type: String, required: true, index: true },
     querySets: { type: Schema.Types.Mixed, required: true },
     stats: { type: Schema.Types.Mixed, required: true },
+    // Only set when access management is enabled - see lib/auth/session.ts.
+    // Absent on runs saved before that feature existed, and on every run
+    // saved while it's off, so history stays library-wide (not per-user)
+    // exactly as before on a deployment that never turns access management on.
+    userId: { type: Schema.Types.ObjectId, ref: "User", index: true },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

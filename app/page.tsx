@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { BookOpen, ShieldCheck, RefreshCw, GitCompareArrows } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { Badges } from "@/components/Badges";
@@ -20,20 +19,6 @@ export default function Home() {
           <h1 className="text-3xl font-bold tracking-tight sm:text-5xl">{home.title}</h1>
           <p className="max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">{home.subtitle}</p>
           <Badges />
-          <div className="flex flex-wrap gap-3 pt-2">
-            <Link
-              href="/settings"
-              className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
-            >
-              {home.connectLibrary}
-            </Link>
-            <Link
-              href="/compare"
-              className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
-            >
-              {home.goToCompare}
-            </Link>
-          </div>
         </div>
       </section>
 

@@ -24,8 +24,6 @@ export interface Messages {
   home: {
     title: string;
     subtitle: string;
-    connectLibrary: string;
-    goToCompare: string;
     features: FeatureItem[];
   };
   settings: {
@@ -173,8 +171,6 @@ export const translations: Record<Language, Messages> = {
       title: "ZoteroSciStats",
       subtitle:
         "Publikationsstatistiken direkt aus eurer Zotero-Bibliothek – gefiltert nach Tags, Autor:innen und Datumsgrenzen, mit Vergleich mehrerer Suchen nebeneinander. Reiner Lesezugriff, lokaler Cache in MongoDB.",
-      connectLibrary: "Bibliothek verbinden",
-      goToCompare: "Zum Vergleich",
       features: [
         {
           title: "Strikt lesend",
@@ -345,8 +341,6 @@ export const translations: Record<Language, Messages> = {
       title: "ZoteroSciStats",
       subtitle:
         "Publication statistics straight from your Zotero library - filtered by tags, authors, and date ranges, with side-by-side comparison of multiple searches. Read-only access, local cache in MongoDB.",
-      connectLibrary: "Connect library",
-      goToCompare: "Go to Compare",
       features: [
         {
           title: "Strictly read-only",

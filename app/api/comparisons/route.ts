@@ -2,17 +2,23 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db/mongodb";
 import { Config } from "@/lib/db/models/Config";
 import { ComparisonRun } from "@/lib/db/models/ComparisonRun";
+import { getOwnerFilter } from "@/lib/auth/session";
 
 const HISTORY_LIMIT = 20;
 
 export async function GET() {
+  const ownerFilter = await getOwnerFilter();
+  if (!ownerFilter) {
+    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  }
+
   await connectToDatabase();
   const config = await Config.findOne({ singleton: "config" }).lean();
   if (!config?.libraryId) {
     return NextResponse.json({ runs: [] });
   }
 
-  const runs = await ComparisonRun.find({ libraryId: config.libraryId })
+  const runs = await ComparisonRun.find({ libraryId: config.libraryId, ...ownerFilter })
     .sort({ createdAt: -1 })
     .limit(HISTORY_LIMIT)
     .lean();
@@ -21,6 +27,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const ownerFilter = await getOwnerFilter();
+  if (!ownerFilter) {
+    return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  }
+
   const { querySets, stats } = (await request.json()) ?? {};
   if (!Array.isArray(querySets) || !Array.isArray(stats)) {
     return NextResponse.json({ error: "querySets and stats are required." }, { status: 400 });
@@ -32,10 +43,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No library configured yet." }, { status: 409 });
   }
 
-  const run = await ComparisonRun.create({ libraryId: config.libraryId, querySets, stats });
+  const run = await ComparisonRun.create({ libraryId: config.libraryId, querySets, stats, ...ownerFilter });
 
-  // Keep the history bounded - drop anything older than the limit.
-  const stale = await ComparisonRun.find({ libraryId: config.libraryId })
+  // Keep the history bounded - drop anything older than the limit, scoped
+  // the same way (per-user when access management is on, library-wide otherwise).
+  const stale = await ComparisonRun.find({ libraryId: config.libraryId, ...ownerFilter })
     .sort({ createdAt: -1 })
     .skip(HISTORY_LIMIT)
     .select({ _id: 1 })

@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/db/mongodb";
 import { User } from "@/lib/db/models/User";
 import { requireAdmin } from "@/lib/auth/session";
 import { generatePassword, hashPassword } from "@/lib/auth/passwords";
+import { seedDemoRunsForUser } from "@/lib/auth/seedDemoRuns";
 
 export async function GET() {
   if (!(await requireAdmin())) {
@@ -34,6 +35,12 @@ export async function POST(request: Request) {
   const password = generatePassword();
   const passwordHash = await hashPassword(password);
   const user = await User.create({ username: username.trim(), passwordHash, role: "member" });
+
+  try {
+    await seedDemoRunsForUser(String(user._id));
+  } catch {
+    // Best-effort - a demo-seeding hiccup must never block member creation.
+  }
 
   // The only moment this plaintext password ever exists outside the
   // admin's own memory - never stored, never logged, never returned again.

@@ -9,6 +9,9 @@ const NetworkRunSchema = new Schema(
     libraryId: { type: String, required: true, index: true },
     querySets: { type: Schema.Types.Mixed, required: true },
     network: { type: Schema.Types.Mixed, required: true },
+    // Same opt-in per-user ownership as ComparisonRun.userId - see that
+    // model's comment.
+    userId: { type: Schema.Types.ObjectId, ref: "User", index: true },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

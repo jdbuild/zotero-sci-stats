@@ -4,8 +4,8 @@ import { NetworkRun } from "@/lib/db/models/NetworkRun";
 import { computeQuerySetStats, type QuerySetInput } from "@/lib/stats/aggregate";
 
 const DEMO_COMPARE_QUERY_SETS: { name: string; tag: string }[] = [
-  { name: "Center for Digital Health and Social Innovation", tag: "CDHSI" },
-  { name: "Institut für Gesundheitswissenschaften", tag: "IGW" },
+  { name: "CDHSI", tag: "Center for Digital Health and Social Innovation" },
+  { name: "IGW", tag: "Institut für Gesundheitswissenschaften" },
 ];
 const DEMO_COMPARE_DATE_FROM = "2025-01-01";
 const DEMO_COMPARE_DATE_TO = "2025-12-31";

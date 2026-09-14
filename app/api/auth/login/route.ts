@@ -15,9 +15,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Username and password are required." }, { status: 400 });
   }
 
-  await ensureBootstrapAdmin();
-  await connectToDatabase();
-  const user = await User.findOne({ username }).lean();
+  let user;
+  try {
+    await ensureBootstrapAdmin();
+    await connectToDatabase();
+    user = await User.findOne({ username }).lean();
+  } catch (err) {
+    // A MongoDB Atlas free-tier cluster can take 5-10s to wake up after
+    // being idle - without this, that timeout looked exactly like a wrong
+    // password to whoever was logging in.
+    if (err instanceof Error && err.name === "MongooseServerSelectionError") {
+      return NextResponse.json(
+        { error: "Database is still waking up after a period of inactivity - please try again in a few seconds." },
+        { status: 503 }
+      );
+    }
+    throw err;
+  }
+
   if (!user || !(await verifyPassword(password, user.passwordHash))) {
     return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
   }

@@ -24,7 +24,11 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
       // Fail fast instead of the ~30s default - MongoDB being unreachable
       // (e.g. `docker compose up -d` not run yet) should surface as a
       // quick, clear error, not a long hang that looks like nothing happened.
-      serverSelectionTimeoutMS: 5000,
+      // 15s (not 5s) because a MongoDB Atlas free-tier cluster can take
+      // 5-10s to respond after being idle - 5s was cutting that off
+      // mid-wakeup and surfacing as a connection error on the very next
+      // request after a quiet period.
+      serverSelectionTimeoutMS: 15000,
     });
   }
 

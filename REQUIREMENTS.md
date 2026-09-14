@@ -387,6 +387,33 @@ Overview/Compare/Network/Settings/Logout; logged back in as admin and
 confirmed the full nav (including Settings and Logout) still renders
 correctly, no regression.
 
+## Bug fix: login looked broken during MongoDB Atlas free-tier cold starts
+
+Reported after real use on the deployed Atlas free-tier cluster: logging
+in sometimes looked like a wrong username/password, but wasn't.
+
+**Root cause**: `connectToDatabase()`'s `serverSelectionTimeoutMS` was 5s
+- deliberately short so a missing local Docker MongoDB fails fast during
+development. An Atlas M0 (free-tier) cluster can take 5-10s to respond
+after being idle, so the very first request after a quiet period could
+get its connection attempt cut off mid-wakeup. The login route had no
+try/catch around that, so the resulting error was an uncaught, generic
+500 - the frontend fell back to a vague "unknown error" message that
+read exactly like invalid credentials.
+
+| Fix | Status |
+| --- | --- |
+| Give Atlas's cold start enough time to actually finish | ✅ `serverSelectionTimeoutMS` raised from 5s to 15s in [`lib/db/mongodb.ts`](lib/db/mongodb.ts) - still far under Mongoose's 30s default, but comfortably covers the observed 5-10s wakeup window. |
+| Never let a connection timeout masquerade as "wrong password" | ✅ [`app/api/auth/login/route.ts`](app/api/auth/login/route.ts) now catches `MongooseServerSelectionError` specifically and returns a distinct `503` with "Database is still waking up after a period of inactivity - please try again in a few seconds," instead of falling through to the generic error path. |
+
+**Verification performed**: build + lint pass. Confirmed the exact error
+name Mongoose throws on a connection timeout (`MongooseServerSelectionError`)
+against a real unreachable host, then live-tested the full route by
+temporarily pointing `.env.local` at an unreachable database (never the
+real Atlas credentials) and confirming the login page correctly shows
+the new "still waking up" message after ~15s, instead of a generic
+error. `.env.local` restored to the exact original value afterward.
+
 ## Open / explicitly deferred
 
 - Automatic sync on app startup (currently manual button only).

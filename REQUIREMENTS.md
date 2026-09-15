@@ -414,6 +414,47 @@ real Atlas credentials) and confirming the login page correctly shows
 the new "still waking up" message after ~15s, instead of a generic
 error. `.env.local` restored to the exact original value afterward.
 
+### Follow-up: the above fix was incomplete, plus a stray Logout button on `/login`
+
+Reported after further real use: login still intermittently failed, and
+`/login` sometimes showed a Logout button next to the login form - which
+reads as broken (why would I need to log out from the login page?).
+
+**Two separate root causes**, both missed by the first pass:
+
+1. `connectToDatabase()`'s cache reused `cache.conn` purely based on it
+   being *set*, never checking whether the underlying connection was
+   still actually alive. If Atlas (or a network hop) silently closed an
+   idle connection, the next query against that stale cached connection
+   failed with some *other* error - not necessarily named
+   `MongooseServerSelectionError` - which the login route's narrow,
+   name-specific catch didn't recognize, so it fell through to an
+   uncaught, generic error again.
+2. The Logout button in `Nav.tsx` was rendered unconditionally on
+   `showLogout` alone, with no check for being on the login page - unlike
+   the page-link menu, which the previous round *did* correctly hide on
+   `/login`. Someone who still held a genuinely valid session (e.g. an
+   old bookmark to `/login`, or navigating back) would see both the login
+   form and a working Logout button at once.
+
+| Fix | Status |
+| --- | --- |
+| Don't reuse a connection that's no longer actually connected | ✅ `connectToDatabase()` now checks `cache.conn.connection.readyState === 1` before reusing it, and forces a fresh connection attempt otherwise - fixes this class of bug everywhere the app touches MongoDB, not just login. |
+| Never let *any* database hiccup during login look like a credentials problem | ✅ Broadened the login route's catch from one specific error name to catching anything thrown in that block at all - a genuine "wrong password" never throws (it returns its own `401` directly), so any exception there is by definition an infrastructure issue. |
+| Hide the Logout button on `/login`, matching the page-link menu | ✅ `{showLogout && !onLoginPage && (...)}` in `Nav.tsx`. |
+| Don't show a login form to someone already logged in at all | ✅ `/login` now checks `/api/auth/me` on mount and redirects to `/` immediately if a role is already present - fixes the confusing state at its source rather than just hiding one button. |
+| "state of the art" waking-up feedback, not just a bare spinner | ✅ If a login attempt takes longer than 2.5s, the form shows an explicit "Database is waking up - this can take up to 15 seconds…" line (DE/EN) alongside the spinner. A `503` ("waking up") response is retried automatically up to twice with a short delay before ever showing an error to the user - most cold-start and stale-connection cases now resolve with no visible error at all. |
+
+**Verification performed**: build + lint pass. Live-tested against the
+real Atlas database first to confirm normal login and the redirect-away
+behavior work with no regression. Then, using a deliberately unreachable
+database (never the real credentials): confirmed the login route still
+returns the friendly `503` (now via the broadened catch, not the narrow
+error-name check), and confirmed via a real form submission that the
+"Database is waking up…" message appears after ~2.5s while the button
+still reads "Logging in…". `.env.local` restored to the exact original
+value afterward.
+
 ## Open / explicitly deferred
 
 - Automatic sync on app startup (currently manual button only).

@@ -20,6 +20,7 @@ export interface Messages {
     passwordLabel: string;
     loginButton: string;
     loggingIn: string;
+    wakingUpDatabase: string;
   };
   home: {
     title: string;
@@ -166,6 +167,7 @@ export const translations: Record<Language, Messages> = {
       passwordLabel: "Passwort",
       loginButton: "Anmelden",
       loggingIn: "Melde an…",
+      wakingUpDatabase: "Datenbank wacht auf – das kann bis zu 15 Sekunden dauern…",
     },
     home: {
       title: "ZoteroSciStats",
@@ -336,6 +338,7 @@ export const translations: Record<Language, Messages> = {
       passwordLabel: "Password",
       loginButton: "Log in",
       loggingIn: "Logging in…",
+      wakingUpDatabase: "Database is waking up - this can take up to 15 seconds…",
     },
     home: {
       title: "ZoteroSciStats",

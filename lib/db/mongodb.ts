@@ -16,7 +16,16 @@ const cache: MongooseCache = global._mongooseCache ?? { conn: null, promise: nul
 global._mongooseCache = cache;
 
 export async function connectToDatabase(): Promise<typeof mongoose> {
-  if (cache.conn) return cache.conn;
+  if (cache.conn) {
+    if (cache.conn.connection.readyState === 1) return cache.conn;
+    // A cached connection that's no longer actually ready (e.g. Atlas or a
+    // network hop silently closed it while idle) must not be reused - the
+    // next query on it would fail with some other, unpredictable error
+    // instead of a clean connection error, which is much harder to
+    // recognize and handle gracefully. Force a fresh attempt instead.
+    cache.conn = null;
+    cache.promise = null;
+  }
 
   if (!cache.promise) {
     cache.promise = mongoose.connect(MONGODB_URI, {

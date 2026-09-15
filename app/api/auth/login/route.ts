@@ -15,41 +15,42 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Username and password are required." }, { status: 400 });
   }
 
-  let user;
+  let response: NextResponse;
   try {
     await ensureBootstrapAdmin();
     await connectToDatabase();
-    user = await User.findOne({ username }).lean();
-  } catch (err) {
-    // A MongoDB Atlas free-tier cluster can take 5-10s to wake up after
-    // being idle - without this, that timeout looked exactly like a wrong
-    // password to whoever was logging in.
-    if (err instanceof Error && err.name === "MongooseServerSelectionError") {
-      return NextResponse.json(
-        { error: "Database is still waking up after a period of inactivity - please try again in a few seconds." },
-        { status: 503 }
-      );
+    const user = await User.findOne({ username }).lean();
+    if (!user || !(await verifyPassword(password, user.passwordHash))) {
+      return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
     }
-    throw err;
+
+    const { token, expiresAt } = await createSession(String(user._id), user.role as "admin" | "member");
+    response = NextResponse.json({ role: user.role });
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax" as const,
+      path: "/",
+      expires: expiresAt,
+    };
+    response.cookies.set(SESSION_COOKIE, token, cookieOptions);
+    // Cheap role hint for proxy.ts's optimistic /settings redirect - never
+    // the real check, see isAdminOrAuthDisabled()/requireAdmin().
+    response.cookies.set(ROLE_COOKIE, user.role, cookieOptions);
+  } catch (err) {
+    // Nothing above this catch throws for a genuine "wrong credentials" -
+    // that path returns its own 401 directly. Anything that does throw is
+    // an infrastructure hiccup (most commonly: a MongoDB Atlas free-tier
+    // cluster taking 5-10s to wake up after being idle, or a cached
+    // connection that went stale and needs re-establishing) - without this,
+    // it surfaced as a generic error that looked exactly like a wrong
+    // password to whoever was logging in.
+    console.error("Login: database error", err);
+    return NextResponse.json(
+      { error: "Database is still waking up after a period of inactivity - please try again in a few seconds." },
+      { status: 503 }
+    );
   }
 
-  if (!user || !(await verifyPassword(password, user.passwordHash))) {
-    return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
-  }
-
-  const { token, expiresAt } = await createSession(String(user._id), user.role as "admin" | "member");
-
-  const response = NextResponse.json({ role: user.role });
-  const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as const,
-    path: "/",
-    expires: expiresAt,
-  };
-  response.cookies.set(SESSION_COOKIE, token, cookieOptions);
-  // Cheap role hint for proxy.ts's optimistic /settings redirect - never
-  // the real check, see isAdminOrAuthDisabled()/requireAdmin().
-  response.cookies.set(ROLE_COOKIE, user.role, cookieOptions);
   return response;
 }

@@ -74,6 +74,57 @@ lets all of these derived fields be recomputed later without a re-sync
 reads (volume/issue/pages/publisher/etc. aren't modeled as their own
 fields).
 
+## Database connection resilience
+
+`connectToDatabase()` ([`lib/db/mongodb.ts`](lib/db/mongodb.ts)) caches
+the Mongoose connection in a global so repeated requests (and dev
+hot-reloads) reuse one connection instead of opening a new one each time.
+Two things matter for this specifically because the deployed database is
+a MongoDB Atlas **free-tier (M0)** cluster, not a local/self-hosted one:
+
+- **A cached connection is only reused if it's actually still connected**
+  (`cache.conn.connection.readyState === 1`) - not just because a
+  reference to it exists. Atlas, or a network hop in between, can
+  silently close a connection that's sat idle for a while; reusing that
+  stale reference would surface as the *next query* failing with some
+  unpredictable error, rather than a clean "connection lost" - much
+  harder to diagnose and handle gracefully. A not-actually-connected
+  cache is discarded and a fresh connection attempted instead.
+- **`serverSelectionTimeoutMS` is 15s**, not Mongoose's 30s default and
+  not an aggressively short one either - a free-tier Atlas cluster can
+  take 5-10s to respond right after being idle, and a too-short timeout
+  cuts that off mid-wakeup, which looks identical to the database being
+  genuinely unreachable.
+
+Because both of these are about *reacting well* to a cold or dropped
+connection, [`instrumentation.ts`](instrumentation.ts) (Next's `register()`
+hook - runs once per server start, see
+`node_modules/next/dist/docs/.../instrumentation.md`) exists to reduce how
+often anyone hits that path at all: it warms the connection before the
+first real request, then pings it again every 4 minutes for the life of
+the server process so it doesn't go idle long enough to be silently
+closed in the first place. This is best-effort, not a guarantee - a fresh
+deploy, or a ping that happens to land during a genuine Atlas outage,
+still needs the reactive handling above.
+
+The login route ([`app/api/auth/login/route.ts`](app/api/auth/login/route.ts))
+is the one place this is most visible to a user, since a connection
+failure there would otherwise look exactly like a wrong username/password
+(the request throws before ever getting to compare a password). It wraps
+every database call in one try/catch and treats *any* exception there as
+an infrastructure hiccup rather than a credentials problem - a genuine
+"wrong password" never throws, it returns its own `401` directly, so
+nothing above that catch is a false positive. The response is a `503`
+with a message that deliberately says nothing about a database, a
+connection, or a cold start - that's an implementation detail, not
+something worth explaining to whoever's trying to log in. The login page
+itself ([`app/login/page.tsx`](app/login/page.tsx)) retries a `503`
+automatically up to twice with a short delay before showing anything to
+the user, and if a single attempt takes more than 2.5s, shows a plain
+"still loading, this is taking a little longer than usual" hint next to
+the spinner - deliberately not naming a specific duration, since that
+would stop being true the moment a retry is involved.
+
 ## Sync strategy
 
 Zotero's Web API versions every library: each response carries the current
@@ -544,6 +595,8 @@ app/
     users/[id]/route.ts     remove a member (admin only)
 proxy.ts                  renamed from middleware.ts in this Next.js version -
                            optimistic auth/role redirect (see "Access management")
+instrumentation.ts        warms + periodically pings the MongoDB connection on
+                           server start (see "Database connection resilience")
 lib/
   zotero/client.ts        read-only Zotero API client
   zotero/sync.ts           sync orchestration

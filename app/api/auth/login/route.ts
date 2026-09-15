@@ -44,10 +44,12 @@ export async function POST(request: Request) {
     // cluster taking 5-10s to wake up after being idle, or a cached
     // connection that went stale and needs re-establishing) - without this,
     // it surfaced as a generic error that looked exactly like a wrong
-    // password to whoever was logging in.
+    // password to whoever was logging in. The message deliberately says
+    // nothing about a database or cold starts - that's an implementation
+    // detail, not something whoever is logging in needs to know.
     console.error("Login: database error", err);
     return NextResponse.json(
-      { error: "Database is still waking up after a period of inactivity - please try again in a few seconds." },
+      { error: "We're having trouble connecting right now - please try again in a moment." },
       { status: 503 }
     );
   }

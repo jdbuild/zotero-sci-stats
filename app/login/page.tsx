@@ -51,9 +51,12 @@ export default function LoginPage() {
     setSlow(false);
     setError("");
 
-    // A cold Atlas free-tier cluster can take up to ~15s to respond - after
-    // a couple of seconds, say so explicitly instead of leaving a bare
-    // spinner that looks identical to a hang or a broken login.
+    // The backend can occasionally take longer than usual to respond (e.g.
+    // right after a quiet period) - after a couple of seconds, say so in
+    // plain terms instead of leaving a bare spinner that looks identical to
+    // a hang or a broken login. Deliberately doesn't name a cause or a
+    // specific duration - neither is something worth explaining here, and
+    // promising a fixed time would be dishonest once retries are involved.
     const slowTimer = setTimeout(() => setSlow(true), SLOW_THRESHOLD_MS);
 
     try {
@@ -64,8 +67,9 @@ export default function LoginPage() {
           router.refresh();
           return;
         }
-        // 503 specifically means "database is waking up, not your fault" -
-        // retry automatically a couple of times before bothering the user.
+        // 503 specifically means "our side is having a transient problem,
+        // not your fault" - retry automatically a couple of times before
+        // bothering the user with anything.
         if (result.status === 503 && attempt < MAX_AUTO_RETRIES) {
           setSlow(true);
           await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
@@ -112,7 +116,7 @@ export default function LoginPage() {
         {loading && slow && (
           <p className="flex items-center gap-2 text-sm text-zinc-500">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            {t.wakingUpDatabase}
+            {t.stillLoadingSlow}
           </p>
         )}
         {error && <p className="text-sm text-red-600">{error}</p>}

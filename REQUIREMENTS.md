@@ -455,6 +455,31 @@ error-name check), and confirmed via a real form submission that the
 still reads "Logging in…". `.env.local` restored to the exact original
 value afterward.
 
+### Follow-up: don't expose the implementation detail, and reduce how often anyone hits this at all
+
+Two things about the fix above, once asked directly: (1) does the person
+logging in need to know *why* it's slow, and (2) is the timing message
+actually honest given the auto-retries.
+
+| Requirement | Status |
+| --- | --- |
+| The user shouldn't need to know the database is cold-starting - just say something like "still loading" | ✅ Both user-facing strings reworded to say nothing about a database, connections, or cold starts: the in-progress hint now reads "Still loading - this is taking a little longer than usual…" (`stillLoadingSlow` in `lib/i18n/translations.ts`, DE/EN), and the backend's `503` body (shown only if all retries are exhausted) now reads "We're having trouble connecting right now - please try again in a moment." (`app/api/auth/login/route.ts`) - neither mentions MongoDB, Atlas, or cold starts anywhere a user could see them. |
+| The "up to 15 seconds" claim was dishonest once retries are involved (real worst case is ~49s: 3 attempts × 15s + 2 × 2s delay) | ✅ Dropped the specific duration entirely from the user-facing text rather than trying to state a bigger, uglier number - "this is taking a little longer than usual" doesn't promise a duration, so it can't be wrong. |
+| Reduce how often anyone actually experiences the delay, not just cope with it better | ✅ New [`instrumentation.ts`](instrumentation.ts) (Next's `register()` hook, run once per server start - see `node_modules/next/dist/docs/.../instrumentation.md`): warms the MongoDB connection before the first real visitor arrives, then pings it again every 4 minutes for the life of the process so it never sits idle long enough for Atlas or a network hop to silently close it. Doesn't eliminate the cold path entirely (a fresh deploy, or a ping that happens to land mid-outage, can still hit it) - that's exactly why the graceful `503`/retry/generic-message handling above still exists as the fallback. |
+
+**Verification performed**: build + lint pass. Confirmed `register()`
+actually executes on server start and successfully warms the connection
+(via a temporary timing log, removed afterward) - takes well under a
+second when Atlas is already warm, as expected. Confirmed the server
+still starts up cleanly (doesn't crash or hang) when the warm-up itself
+fails, using a deliberately unreachable database - and confirmed via
+`curl` that a request immediately after startup isn't blocked waiting on
+that failed attempt. Re-verified the full user-facing text with the
+database unreachable: the `503` body and the in-progress message both
+read as intended, with no mention of a database anywhere. Real login
+against the actual Atlas database re-confirmed working afterward.
+`.env.local` restored to the exact original value throughout.
+
 ## Open / explicitly deferred
 
 - Automatic sync on app startup (currently manual button only).

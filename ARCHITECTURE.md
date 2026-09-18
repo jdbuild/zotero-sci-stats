@@ -556,16 +556,23 @@ than threaded through as page-level conditionals.
 
 New members are seeded with two saved runs instead of an empty history
 ([`lib/auth/seedDemoRuns.ts`](lib/auth/seedDemoRuns.ts), called right
-after `POST /api/users` creates the account): a real CDHSI-vs-IGW Tag
-Compare (computed via the same `computeQuerySetStats` `/api/stats`
-uses, not a placeholder), and an independent copy of whichever
-`NetworkRun` is currently the most recent for the library — not scoped
-to any particular owner, so it's whatever institutes/filters were last
-actually built, typically the fullest one. The copy is a fully separate
-document; deleting either one never touches the other. Seeding is
-best-effort and wrapped in try/catch by the caller — a library that
-isn't configured yet, or has no network run yet, just means fewer demo
-runs, never a failed member creation.
+after `POST /api/users` creates the account): a real two-tag Tag Compare
+(computed via the same `computeQuerySetStats` `/api/stats` uses, not a
+placeholder), and an independent copy of whichever `NetworkRun` is
+currently the most recent for the library — not scoped to any particular
+owner, so it's whatever institutes/filters were last actually built,
+typically the fullest one. The copy is a fully separate document;
+deleting either one never touches the other. Seeding is best-effort and
+wrapped in try/catch by the caller — a library that isn't configured
+yet, or has no network run yet, just means fewer demo runs, never a
+failed member creation.
+
+The demo comparison's two tags are **not hardcoded** — this repo is
+public, and a real deployment's tags usually identify real
+organizational units in that library. They're read from
+`DEMO_TAG_1`/`DEMO_TAG_1_LABEL`/`DEMO_TAG_2`/`DEMO_TAG_2_LABEL` in
+`.env.local` (git-ignored) instead; unset, the demo comparison is simply
+skipped and only the demo network run is seeded.
 
 ## Project structure
 

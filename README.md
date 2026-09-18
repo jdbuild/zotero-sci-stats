@@ -3,8 +3,8 @@
 ![license](https://img.shields.io/badge/license-MIT-3b82f6) ![next.js](https://img.shields.io/badge/next.js-16-000000) ![mongodb](https://img.shields.io/badge/mongodb-cache%2Fsync-47A248) ![zotero api](https://img.shields.io/badge/zotero%20api-read--only-dc2f36)
 
 Publication statistics for a Zotero library — filter by 1..N tags and a date
-range, and compare multiple such queries side by side (e.g. `#ICMT 2026` vs.
-`#CDHSI 2026`). Built for libraries with thousands of items across many
+range, and compare multiple such queries side by side (e.g. `#unit1 2026` vs.
+`#unit2 2026`). Built for libraries with thousands of items across many
 years, with a local sync cache so you're not re-querying the Zotero API on
 every page load.
 

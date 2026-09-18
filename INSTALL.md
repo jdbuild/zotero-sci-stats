@@ -95,6 +95,11 @@ an account for each person who needs access; each one gets a random
 password shown once, for you to share with them. See
 [ARCHITECTURE.md](ARCHITECTURE.md#access-management) for how this works.
 
+Optionally, set `DEMO_TAG_1`/`DEMO_TAG_1_LABEL` and `DEMO_TAG_2`/
+`DEMO_TAG_2_LABEL` in `.env.local` too, so each new member's demo Tag
+Compare uses two of your own library's real tags instead of being
+skipped — see the comments in [.env.example](.env.example).
+
 ## 8. Use it
 
 Go to **Tag Compare**. Set the shared date range and publication type once at

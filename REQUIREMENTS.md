@@ -13,8 +13,8 @@ Build a Node.js/Next.js app for statistics over a Zotero library.
 - **Output**: a responsive website with filtering by 1..N tags and date
   bounds, producing a summary (e.g. publications for a tag combination).
   Results of several searches should be comparable against each other -
-  e.g. tag `#ICMT` + year 2026 (Institute for Creative Media Technologies)
-  vs. tag `#CDHSI` + year 2026 (CDHSI).
+  e.g. tag `#unit1` + year 2026 (one organizational unit) vs. tag
+  `#unit2` + year 2026 (another).
 
 ### Constraints given up front
 
@@ -160,7 +160,7 @@ against seeded, verified data before being reported done (see below).
 | Requirement | Status |
 | --- | --- |
 | Rename the nav menu entry to "Tag NetworkVis" | ✅ Nav label only - the page itself keeps its "Collaboration Network" title/heading from the prior round, per that round's explicit naming choice. |
-| Rank *all* nodes by collaboration, not just the single most-connected one (e.g. "CDHSI 40 collab, 2nd ..., 3rd ...") | ✅ The single "most connected" sentence was replaced with a full ordered list (`rankNodesByCollab` in `NetworkGraph.tsx`), every node shown with its rank, name, and "{collab} (of {total})". |
+| Rank *all* nodes by collaboration, not just the single most-connected one (e.g. "Unit2 40 collab, 2nd ..., 3rd ...") | ✅ The single "most connected" sentence was replaced with a full ordered list (`rankNodesByCollab` in `NetworkGraph.tsx`), every node shown with its rank, name, and "{collab} (of {total})". |
 | Keep existing (already-run) queries visible/executed rather than replacing them | ✅ History expand/collapse changed from a single `expandedId` to a `Set` of expanded ids on both Compare and Network - running a new comparison/network no longer collapses whatever was already open. |
 | Movable bubbles on the network graph, draggable by mouse | ✅ Pointer-event drag on each node circle, using `getScreenCTM().inverse()` to map screen coordinates into the SVG's internal coordinate space correctly regardless of rendered size. Drag offsets are local display state, reset when the underlying data changes. |
 | Percentages in brackets on Tag Compare's Overview table, plus a total row at the end | ✅ Each item-type cell now reads "N (X%)" (of that row's total), and a `<tfoot>` total row sums every column with its own overall percentage. |
@@ -277,11 +277,11 @@ target; declared on both compared rosters -> unassigned (as before);
 new `otherInstitute` category**, shown in the UI as "initiated by
 another tracked institute."
 
-**Verification**: built the same CDHSI x ICMT pair twice against real
-data - once in a 2-node network (just CDHSI + ICMT), once in a 3-node
-network with IGW added. Total overlap count was identical (14) in both,
-but one item moved from ICMT's count to the new `otherInstitute` bucket
-once IGW was checked - proving the bug was real and the fix corrects it
+**Verification**: built the same Unit2 x Unit1 pair twice against real
+data - once in a 2-node network (just Unit2 + Unit1), once in a 3-node
+network with Unit3 added. Total overlap count was identical (14) in both,
+but one item moved from Unit1's count to the new `otherInstitute` bucket
+once Unit3 was checked - proving the bug was real and the fix corrects it
 without losing or double-counting anything. Sum invariant
 (sourceWins + targetWins + unassigned + otherInstitute = edge count)
 verified exactly across every edge of a live 7-institute network build,
@@ -337,8 +337,9 @@ Given once the access-management flag was actually turned on for real
 | Remove the "Connect library" / "Go to Compare" buttons from the landing page - not needed anymore | ✅ Removed from `app/page.tsx`, plus the now-unused `home.connectLibrary`/`home.goToCompare` translation keys. |
 | Each user should have their own Tag Compare / Tag NetworkVis history, not one shared list | ✅ New optional `userId` field on `ComparisonRun`/`NetworkRun` (`lib/db/models/`). A shared `getOwnerFilter()` helper (`lib/auth/session.ts`) returns `{ userId }` when access management is on and the caller is authenticated, or `{}` when it's off - spread directly into every Mongo query/`.create()` call in `/api/comparisons*` and `/api/network-runs*`, so history is per-user when the feature is on and library-wide (exactly as before) when it's off. Delete is also owner-scoped, so one member can't delete another's saved run by guessing its id. |
 | Assign the existing (pre-feature) comparison/network runs to the admin account | ✅ One-time migration: all 20 pre-existing `comparisonruns` and 20 `networkruns` (every one of them - the feature didn't exist before, so none had an owner) were assigned to the admin's user id directly in MongoDB. |
-| New members should land on something instead of an empty history - a demo Tag Compare (CDHSI vs. IGW) and a demo network with all the institutes/filters (the most recent real network run), auto-injected when the account is created | ✅ `lib/auth/seedDemoRuns.ts`'s `seedDemoRunsForUser()`, called from `POST /api/users` right after the account is created. Computes a real comparison (`computeQuerySetStats`, same function `/api/stats` uses) and copies whatever the single most recent `NetworkRun` for the library is (independent copy, not a shared reference - deleting one never affects the other). Best-effort: wrapped in try/catch so a seeding hiccup never blocks member creation itself; silently produces fewer/no demo runs if the library isn't configured yet or no network has ever been built. |
-| Demo comparison should read "CDHSI"/"IGW" but scoped to 2025, filtering on the actual full institute names, not the short tags | ✅ Two real, distinct tags exist per institute at very different scales - `CDHSI` (4 items) / `Center for Digital Health and Social Innovation` (199 items), `IGW` (7 items) / `Institut für Gesundheitswissenschaften` (988 items). Verified against real tag data (not assumed) before implementing. The demo now filters on the full-name tags (`Center for Digital Health and Social Innovation`, `Institut für Gesundheitswissenschaften`) with `dateFrom`/`dateTo` set to `2025-01-01`/`2025-12-31`, labeled with the short "CDHSI"/"IGW" names - initially built the other way around (short tag, full name as label) and corrected once caught. |
+| New members should land on something instead of an empty history - a demo Tag Compare (two configurable organizational units) and a demo network with all the institutes/filters (the most recent real network run), auto-injected when the account is created | ✅ `lib/auth/seedDemoRuns.ts`'s `seedDemoRunsForUser()`, called from `POST /api/users` right after the account is created. Computes a real comparison (`computeQuerySetStats`, same function `/api/stats` uses) and copies whatever the single most recent `NetworkRun` for the library is (independent copy, not a shared reference - deleting one never affects the other). Best-effort: wrapped in try/catch so a seeding hiccup never blocks member creation itself; silently produces fewer/no demo runs if the library isn't configured yet or no network has ever been built. |
+| Demo comparison should read with a short label but filter on the actual full institute tag names, not the short ones | ✅ Two real, distinct tags exist per institute at very different scales - the short tag (single digits of items) and a much larger full-name tag (hundreds of items). Verified against real tag data (not assumed) before implementing. The demo filters on the full-name tags, `dateFrom`/`dateTo` set to `2025-01-01`/`2025-12-31`, labeled with the short names - initially built the other way around (short tag, full name as label) and corrected once caught. |
+| Don't hardcode real institute/tag names in committed source at all - this repo is public | ✅ The two demo tags moved out of source entirely into `DEMO_TAG_1`/`DEMO_TAG_1_LABEL`/`DEMO_TAG_2`/`DEMO_TAG_2_LABEL` env vars (`.env.local`, git-ignored) - `lib/auth/seedDemoRuns.ts` reads them at request time; unset means the demo comparison is simply skipped (the demo network run, if one exists, is unaffected). Documented in `.env.example` and `INSTALL.md`. Same pass also anonymized every prior mention of the real institute names throughout this file, `README.md`, `ARCHITECTURE.md`, the UI's own example-loading feature, and its translation strings - to generic `Unit1`/`Unit2`/`Unit3` placeholders. |
 | Must keep working exactly as before when there's no access management at all (flag off, zero users) | ✅ Explicit design constraint, not an afterthought - `getOwnerFilter()` returning `{}` when the flag is off means none of this touches the unscoped/global behavior. Confirmed live: with the flag turned off, `/api/comparisons` and `/api/network-runs` still return the full, unscoped 20/20 history, and `/settings` remains reachable with no login prompt - byte-for-byte the pre-existing behavior. |
 
 **Verification performed**: build + lint pass on every change in this
@@ -348,8 +349,8 @@ the medal-race round's live-data testing): confirmed the admin sees all
 20+20 migrated runs; created real test member accounts and confirmed
 each sees *exactly* 2 runs (their own seeded demo comparison and
 network), not the admin's or another member's; confirmed the final demo
-comparison's stats are real, substantial 2025 numbers (CDHSI: 45, IGW:
-72 - not the near-empty 4/7 the initial, wrong-tag version produced);
+comparison's stats are real, substantial 2025 numbers (45 and 72 - not
+the near-empty 4/7 the initial, wrong-tag version produced);
 confirmed the demo network run is an independent copy of the last real
 7-institute network. Then confirmed the flag-off path separately:
 temporarily commented out `NEXT_PUBLIC_AUTH_ENABLED` and restarted,

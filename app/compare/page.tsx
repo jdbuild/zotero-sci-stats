@@ -77,10 +77,10 @@ export default function ComparePage() {
   }
 
   function loadExample() {
-    const a = newQuerySet("ICMT 2026");
-    a.tags = ["ICMT"];
-    const b = newQuerySet("CDHSI 2026");
-    b.tags = ["CDHSI"];
+    const a = newQuerySet("Unit1 2026");
+    a.tags = ["unit1"];
+    const b = newQuerySet("Unit2 2026");
+    b.tags = ["unit2"];
     setQuerySets([a, b]);
     setGlobalFilter({ dateFrom: "2026-01-01", dateTo: "2026-12-31", excludedItemTypes: [] });
   }

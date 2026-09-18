@@ -184,7 +184,7 @@ export const translations: Record<Language, Messages> = {
         },
         {
           title: "Mehrere Suchen vergleichen",
-          text: "Kombiniert 1–N Tags und Autor:innen mit UND/ODER-Logik und Datumsgrenzen zu benannten Query-Sets – z. B. #ICMT 2026 gegen #CDHSI 2026 – und vergleicht sie nebeneinander.",
+          text: "Kombiniert 1–N Tags und Autor:innen mit UND/ODER-Logik und Datumsgrenzen zu benannten Query-Sets – z. B. #unit1 2026 gegen #unit2 2026 – und vergleicht sie nebeneinander.",
         },
         {
           title: "Für große Bibliotheken",
@@ -243,7 +243,7 @@ export const translations: Record<Language, Messages> = {
     compare: {
       title: "Tag-Vergleich",
       subtitle: "Stellt mehrere Tag- und Autor:innen-Kombinationen innerhalb desselben Zeitraums nebeneinander gegenüber.",
-      loadExample: "Beispiel laden (ICMT vs. CDHSI)",
+      loadExample: "Beispiel laden (Unit1 vs. Unit2)",
       querySetNamePlaceholder: "Name des Query-Sets",
       removeQuerySet: "Query-Set entfernen",
       tagsLabel: "Tags",
@@ -355,7 +355,7 @@ export const translations: Record<Language, Messages> = {
         },
         {
           title: "Compare multiple searches",
-          text: "Combine 1..N tags and authors with AND/OR logic and a date range into named query sets - e.g. #ICMT 2026 vs. #CDHSI 2026 - and compare them side by side.",
+          text: "Combine 1..N tags and authors with AND/OR logic and a date range into named query sets - e.g. #unit1 2026 vs. #unit2 2026 - and compare them side by side.",
         },
         {
           title: "Built for large libraries",
@@ -413,7 +413,7 @@ export const translations: Record<Language, Messages> = {
     compare: {
       title: "Tag Compare",
       subtitle: "Put several tag and author combinations, within the same time range, side by side.",
-      loadExample: "Load example (ICMT vs. CDHSI)",
+      loadExample: "Load example (Unit1 vs. Unit2)",
       querySetNamePlaceholder: "Query set name",
       removeQuerySet: "Remove query set",
       tagsLabel: "Tags",

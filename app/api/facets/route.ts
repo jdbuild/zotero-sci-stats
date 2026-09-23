@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db/mongodb";
 import { Config } from "@/lib/db/models/Config";
 import { computeFacets, type MatchFilter } from "@/lib/stats/aggregate";
-import { isPeerReviewed, itemTypeLabel } from "@/lib/zotero/itemTypes";
+import { itemTypeCategory, itemTypeLabel } from "@/lib/zotero/itemTypes";
 
 /**
  * Tag/author/item-type suggestions for the Compare page, scoped to a
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       itemType: c.itemType,
       label: itemTypeLabel(c.itemType),
       count: c.count,
-      peerReviewed: isPeerReviewed(c.itemType),
+      category: itemTypeCategory(c.itemType),
     })),
   });
 }

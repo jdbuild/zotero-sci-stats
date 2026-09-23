@@ -138,15 +138,17 @@ sequenceDiagram
     participant DB as MongoDB
     participant Z as Zotero API
 
-    U->>App: Click "Sync now" (or app startup)
+    U->>App: Click "Sync now" (or "Force full resync")
     App->>DB: read syncmetas.lastVersion
-    alt lastVersion == 0 (first run)
+    alt lastVersion == 0, or forced
         App->>Z: GET /items?start=0..N (full paginated walk)
     else incremental
         App->>Z: GET /items?since=lastVersion&start=0..N
-        App->>Z: GET /deleted?since=lastVersion
+        App->>Z: GET /deleted?since=lastVersion (permanent removals)
         App->>DB: delete items removed upstream
     end
+    App->>Z: GET /items/trash?format=keys (every sync, not version-gated)
+    App->>DB: delete any cached items now trashed
     App->>DB: upsert all fetched items (by zoteroKey)
     Note over App,DB: lastVersion only advances here,<br/>after every page succeeded
     App->>DB: write syncmetas.lastVersion = max(Last-Modified-Version)
@@ -162,7 +164,32 @@ skips items.
 
 Sync is currently triggered **manually** via the Sync button on the
 Settings page (`POST /api/sync`); an automatic on-startup check is a
-natural future addition (see below) but isn't wired up yet.
+natural future addition (see below) but isn't wired up yet. A second
+button, **Force full resync** (`POST /api/sync` with `{ forceFullSync:
+true }`), re-fetches the entire library regardless of the stored
+checkpoint - for recovering the cache if it's drifted from Zotero for
+any reason - without resetting `lastVersion` itself; the run still
+advances it to the library's current version afterward, same as any
+other sync, so future runs continue incrementally.
+
+### Trashed items need their own detection path
+
+Zotero's **Trash** is a soft-delete, and it's invisible to both of the
+mechanisms above: the default `/items` listing (`getItemsPage`) silently
+**excludes trashed items entirely** - confirmed directly against the
+live API, they don't come back with a `deleted` flag to check, they
+simply never appear in the response - and `/deleted` only ever reports
+**permanent** removals, never trash moves. Between the two, an item
+moved to trash was completely invisible to every sync this app ran; it
+would sit in the local cache forever, showing up as a duplicate of
+whatever it was merged into.
+
+The fix is a third, independent check: `getTrashedItemKeys()`
+(`lib/zotero/client.ts`) calls Zotero's dedicated `/items/trash` endpoint
+(the lightweight `format=keys` variant, paginated) and `runSync()` removes
+any matching items from the cache. This runs on **every** sync, full or
+incremental - trash isn't tied to a version checkpoint, so there's no
+"since" to filter by, and no reason to skip it either way.
 
 Each run reports, and persists onto `syncmetas`: wall-clock **duration**,
 the approximate **bytes** of item payload pulled from Zotero, and how many

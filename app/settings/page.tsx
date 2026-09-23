@@ -213,11 +213,15 @@ export default function SettingsPage() {
     }
   }
 
-  async function triggerSync() {
+  async function triggerSync(forceFullSync = false) {
     setSyncing(true);
     setSyncError("");
     try {
-      const res = await fetch("/api/sync", { method: "POST" });
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ forceFullSync }),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? messages.common.unknownError);
       await loadSyncStatus();
@@ -354,14 +358,24 @@ export default function SettingsPage() {
           <p className="mt-3 text-sm text-zinc-500">{t.cacheSize}: {formatBytes(cacheSizeBytes)}</p>
         )}
 
-        <button
-          onClick={triggerSync}
-          disabled={!config?.configured || syncing}
-          className="mt-4 flex items-center gap-2 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-zinc-900"
-        >
-          <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
-          {syncing ? t.syncing : t.syncNow}
-        </button>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => triggerSync(false)}
+            disabled={!config?.configured || syncing}
+            className="flex items-center gap-2 rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-zinc-900"
+          >
+            <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? t.syncing : t.syncNow}
+          </button>
+          <button
+            onClick={() => triggerSync(true)}
+            disabled={!config?.configured || syncing}
+            className="flex items-center gap-2 rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:hover:bg-zinc-800"
+          >
+            {t.forceFullSync}
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-zinc-500">{t.forceFullSyncHint}</p>
         {syncError && <p className="mt-2 text-sm text-red-600">{syncError}</p>}
       </section>
 

@@ -18,12 +18,14 @@ export async function GET() {
   return NextResponse.json({ status, cacheSizeBytes });
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   if (!(await isAdminOrAuthDisabled())) {
     return NextResponse.json({ error: "Admin access required." }, { status: 403 });
   }
+  const body = await request.json().catch(() => ({}));
+  const forceFullSync = body?.forceFullSync === true;
   try {
-    const result = await runSync();
+    const result = await runSync({ forceFullSync });
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     if (err instanceof SyncNotConfiguredError) {

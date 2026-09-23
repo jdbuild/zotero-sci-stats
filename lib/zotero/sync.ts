@@ -2,7 +2,7 @@ import { connectToDatabase } from "@/lib/db/mongodb";
 import { Config } from "@/lib/db/models/Config";
 import { Item } from "@/lib/db/models/Item";
 import { SyncMeta } from "@/lib/db/models/SyncMeta";
-import { getDeleted, getItemsPage } from "@/lib/zotero/client";
+import { getDeleted, getItemsPage, getTrashedItemKeys } from "@/lib/zotero/client";
 import { creatorNames } from "@/lib/zotero/creators";
 import { parsePublicationDate, parsePublicationYear } from "@/lib/zotero/parseDate";
 import type { ZoteroItemResponse, ZoteroLibraryType } from "@/lib/zotero/types";
@@ -56,8 +56,13 @@ export interface SyncResult {
  * SyncMeta.lastVersion only advances after every page succeeded, so a
  * failed run never leaves the "since" checkpoint in an inconsistent
  * state - the next attempt simply retries the same (idempotent) window.
+ *
+ * `forceFullSync` re-fetches every item regardless of the stored
+ * checkpoint (without resetting it - `lastVersion` still advances to the
+ * library's current version afterward, same as any other run), for
+ * recovering from a cache that's drifted from Zotero for any reason.
  */
-export async function runSync(): Promise<SyncResult> {
+export async function runSync(options: { forceFullSync?: boolean } = {}): Promise<SyncResult> {
   await connectToDatabase();
 
   const config = await Config.findOne({ singleton: "config" });
@@ -75,7 +80,7 @@ export async function runSync(): Promise<SyncResult> {
 
   await SyncMeta.updateOne({ libraryId }, { status: "syncing", lastError: "" });
 
-  const sinceVersion = meta.lastVersion > 0 ? meta.lastVersion : undefined;
+  const sinceVersion = !options.forceFullSync && meta.lastVersion > 0 ? meta.lastVersion : undefined;
   const startedAt = Date.now();
 
   try {
@@ -91,8 +96,12 @@ export async function runSync(): Promise<SyncResult> {
       maxVersion = Math.max(maxVersion, page.libraryVersion);
       bytesSynced += Buffer.byteLength(JSON.stringify(page.items));
 
+      // Zotero's /items endpoint already excludes trashed items entirely
+      // (confirmed directly against the live API - they don't come back
+      // with a `deleted` flag, they simply never appear here at all), so
+      // nothing needs filtering in this loop - see getTrashedItemKeys
+      // below for how trashed items actually get detected and removed.
       for (const item of page.items) {
-        if (item.data.deleted) continue;
         upserts.push(toItemDocument(libraryId, item));
       }
 
@@ -116,14 +125,25 @@ export async function runSync(): Promise<SyncResult> {
       updated = result.modifiedCount ?? 0;
     }
 
-    // Incremental syncs must also remove items deleted upstream.
-    let deletedCount = 0;
+    // Two independent removal signals, both necessary: /deleted (only
+    // meaningful for incremental syncs - a full fetch already omits
+    // permanently-removed items on its own) reports permanent removals,
+    // but never trash moves. The trash listing (checked every sync,
+    // full or incremental - it isn't tied to a "since" version) catches
+    // those instead - see getTrashedItemKeys's own comment for why the
+    // normal item feed can't be used for this.
+    const keysToRemove = new Set<string>();
     if (sinceVersion !== undefined) {
       const deleted = await getDeleted(apiKey, libType, libraryId, sinceVersion);
-      if (deleted.items.length > 0) {
-        const result = await Item.deleteMany({ libraryId, zoteroKey: { $in: deleted.items } });
-        deletedCount = result.deletedCount ?? deleted.items.length;
-      }
+      deleted.items.forEach((key) => keysToRemove.add(key));
+    }
+    const trashedKeys = await getTrashedItemKeys(apiKey, libType, libraryId);
+    trashedKeys.forEach((key) => keysToRemove.add(key));
+
+    let deletedCount = 0;
+    if (keysToRemove.size > 0) {
+      const result = await Item.deleteMany({ libraryId, zoteroKey: { $in: Array.from(keysToRemove) } });
+      deletedCount = result.deletedCount ?? keysToRemove.size;
     }
 
     const itemCount = await Item.countDocuments({ libraryId });

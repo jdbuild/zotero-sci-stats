@@ -1,12 +1,13 @@
 "use client";
 
 import { useLanguage } from "@/lib/i18n/LanguageProvider";
+import type { ItemTypeCategory } from "@/lib/zotero/itemTypes";
 
 export interface ItemTypeOption {
   itemType: string;
   label: string;
   count: number;
-  peerReviewed: boolean;
+  category: ItemTypeCategory;
 }
 
 export function ItemTypeFilter({
@@ -38,8 +39,9 @@ export function ItemTypeFilter({
     );
   }
 
-  const peerReviewed = options.filter((o) => o.peerReviewed);
-  const other = options.filter((o) => !o.peerReviewed);
+  const peerReviewed = options.filter((o) => o.category === "peerReviewed");
+  const preprints = options.filter((o) => o.category === "preprint");
+  const other = options.filter((o) => o.category === "other");
 
   return (
     <div>
@@ -62,6 +64,13 @@ export function ItemTypeFilter({
         excluded={excluded}
         onToggle={toggle}
         onToggleGroup={() => toggleGroup(peerReviewed)}
+      />
+      <OptionRow
+        label={t.preprintGroup}
+        options={preprints}
+        excluded={excluded}
+        onToggle={toggle}
+        onToggleGroup={() => toggleGroup(preprints)}
       />
       <OptionRow
         label={t.otherTypesGroup}

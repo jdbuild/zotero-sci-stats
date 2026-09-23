@@ -52,6 +52,8 @@ export interface Messages {
     notRecordedYet: string;
     syncNow: string;
     syncing: string;
+    forceFullSync: string;
+    forceFullSyncHint: string;
     reprocessHeading: string;
     reprocessHint: string;
     reprocessButton: string;
@@ -87,6 +89,7 @@ export interface Messages {
     authorModeOr: string;
     itemTypesLabel: string;
     peerReviewedGroup: string;
+    preprintGroup: string;
     otherTypesGroup: string;
     selectAllTypes: string;
     deselectAllTypes: string;
@@ -218,6 +221,9 @@ export const translations: Record<Language, Messages> = {
       notRecordedYet: "wird beim nächsten Sync erfasst",
       syncNow: "Jetzt synchronisieren",
       syncing: "Synchronisiere…",
+      forceFullSync: "Vollständigen Sync erzwingen",
+      forceFullSyncHint:
+        "Ruft die gesamte Bibliothek erneut ab, statt nur Änderungen seit dem letzten Sync - nützlich, um den lokalen Cache wiederherzustellen, falls er aus irgendeinem Grund von Zotero abweicht. Papierkorb-Einträge werden bereits bei jedem normalen \"Jetzt synchronisieren\" erkannt und entfernt, dafür ist dies nicht nötig. Dauert bei großen Bibliotheken länger.",
       reprocessHeading: "Cache neu verarbeiten",
       reprocessHint:
         "Berechnet abgeleitete Felder (z. B. Autor:innen-Namen für die Filterung) für bereits synchronisierte Einträge neu – rein lokal aus den bereits gespeicherten Rohdaten, ohne erneuten Zotero-Zugriff. Sinnvoll direkt nach diesem Update, wenn ihr schon eine große Bibliothek importiert habt.",
@@ -256,6 +262,7 @@ export const translations: Record<Language, Messages> = {
       authorModeOr: "eine:r reicht (ODER)",
       itemTypesLabel: "Publikationstyp",
       peerReviewedGroup: "Peer-reviewed",
+      preprintGroup: "Preprints",
       otherTypesGroup: "Sonstige",
       selectAllTypes: "Alle auswählen",
       deselectAllTypes: "Alle abwählen",
@@ -389,6 +396,9 @@ export const translations: Record<Language, Messages> = {
       notRecordedYet: "will be recorded on the next sync",
       syncNow: "Sync now",
       syncing: "Syncing…",
+      forceFullSync: "Force full resync",
+      forceFullSyncHint:
+        "Re-fetches the whole library instead of just changes since the last sync - useful for recovering the local cache if it's drifted from Zotero for any reason. Trashed items are already detected and removed by every normal \"Sync now\" run, so this isn't needed for that. Takes longer for large libraries.",
       reprocessHeading: "Reprocess cache",
       reprocessHint:
         "Recomputes derived fields (e.g. author names for filtering) for already-synced items - purely from the raw data already stored locally, without touching the Zotero API again. Useful right after this update if you already imported a large library.",
@@ -426,6 +436,7 @@ export const translations: Record<Language, Messages> = {
       authorModeOr: "any author (OR)",
       itemTypesLabel: "Publication type",
       peerReviewedGroup: "Peer-reviewed",
+      preprintGroup: "Preprints",
       otherTypesGroup: "Other",
       selectAllTypes: "Select all",
       deselectAllTypes: "Deselect all",

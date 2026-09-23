@@ -90,6 +90,39 @@ export async function getItemsPage(
   return { items, totalResults, libraryVersion };
 }
 
+/**
+ * All keys currently in the library's trash. Needed because Zotero's
+ * default /items listing (getItemsPage above) silently excludes trashed
+ * items entirely - even from its own incremental `since` feed, they just
+ * never appear, with no flag to detect - and /deleted (below) only ever
+ * reports *permanent* removals, never trash moves. This dedicated trash
+ * listing is the only way to find out an item has been soft-deleted.
+ */
+export async function getTrashedItemKeys(
+  apiKey: string,
+  libraryType: ZoteroLibraryType,
+  libraryId: string
+): Promise<string[]> {
+  const keys: string[] = [];
+  let start = 0;
+  let totalResults = Infinity;
+
+  while (start < totalResults) {
+    const params = new URLSearchParams({ format: "keys", limit: String(PAGE_LIMIT), start: String(start) });
+    const res = await zoteroGet(`${libraryPath(libraryType, libraryId)}/items/trash?${params}`, apiKey);
+    totalResults = Number(res.headers.get("Total-Results") ?? 0);
+    const pageKeys = (await res.text())
+      .split("\n")
+      .map((k) => k.trim())
+      .filter(Boolean);
+    keys.push(...pageKeys);
+    start += pageKeys.length;
+    if (pageKeys.length === 0) break; // safety net against infinite loops
+  }
+
+  return keys;
+}
+
 /** Keys deleted from the library since `sinceVersion`. */
 export async function getDeleted(
   apiKey: string,

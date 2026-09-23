@@ -1,11 +1,17 @@
 /**
- * Zotero item types, human labels, and a peer-review classification used
- * to group the publication-type filter into two sections. This is a
- * pragmatic default (journal articles + conference papers count as
- * peer-reviewed, everything else doesn't) - accurate for most academic
- * libraries, but not a judgment Zotero itself makes.
+ * Zotero item types, human labels, and a classification used to group
+ * the publication-type filter into three sections. This is a pragmatic
+ * default (journal articles + conference papers count as peer-reviewed;
+ * preprints get their own section, since they're real scholarly output
+ * but explicitly not yet peer-reviewed - lumping them into either of the
+ * other two groups would misrepresent them; everything else is "other")
+ * - accurate for most academic libraries, but not a judgment Zotero
+ * itself makes.
  */
 export const PEER_REVIEWED_TYPES = new Set(["journalArticle", "conferencePaper"]);
+const PREPRINT_TYPES = new Set(["preprint"]);
+
+export type ItemTypeCategory = "peerReviewed" | "preprint" | "other";
 
 const ITEM_TYPE_LABELS: Record<string, string> = {
   journalArticle: "Journal Article",
@@ -50,6 +56,8 @@ export function itemTypeLabel(itemType: string): string {
   return ITEM_TYPE_LABELS[itemType] ?? itemType;
 }
 
-export function isPeerReviewed(itemType: string): boolean {
-  return PEER_REVIEWED_TYPES.has(itemType);
+export function itemTypeCategory(itemType: string): ItemTypeCategory {
+  if (PEER_REVIEWED_TYPES.has(itemType)) return "peerReviewed";
+  if (PREPRINT_TYPES.has(itemType)) return "preprint";
+  return "other";
 }

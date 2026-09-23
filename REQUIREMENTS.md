@@ -481,6 +481,52 @@ read as intended, with no mention of a database anywhere. Real login
 against the actual Atlas database re-confirmed working afterward.
 `.env.local` restored to the exact original value throughout.
 
+## Bug fix: trashed Zotero items never got removed from the local cache
+
+Reported as "the same publication shows up 2-3 times when comparing by
+author, and I know they're not actually duplicated in Zotero." Root-caused
+against real data rather than guessed at - see the investigation below.
+
+**What it looked like**: querying by author "Martin Ernst" returned the
+same paper cited 3 times (near-identical formatting, matching separate
+Zotero items). Changing the Zotero API key and re-syncing didn't help.
+
+**What it actually was**: six genuinely separate Zotero items existed
+for the same paper (confirmed live against the Zotero API, not assumed -
+all six returned real, distinct data). Five were later moved to Zotero's
+**Trash** by a collaborator - confirmed via `data.deleted: 1` on each and
+cross-checked against the dedicated `/items/trash` listing. Trash is a
+soft-delete: the desktop app correctly hid them from the normal library
+view, but they remained fully retrievable via the API.
+
+**The real bug**, found by testing the actual sync endpoint directly
+rather than reasoning about it: Zotero's default `/items` listing (what
+`getItemsPage` uses) silently **excludes trashed items entirely** - not
+with a `deleted` flag to check, they simply never appear in the
+response, confirmed by fetching the exact same incremental query the
+sync code uses and checking for the known trashed keys. And `/deleted`
+(the endpoint this app already used to detect removals) **only reports
+permanent deletions, never trash moves**. Between the two, trashing an
+item was completely invisible to every sync this app had ever run -
+verified the existing `if (item.data.deleted) continue` line in
+`runSync()` was actually dead code, since the flag it checks for never
+arrives via that endpoint.
+
+| Fix | Status |
+| --- | --- |
+| Detect and remove trashed items on every sync | ✅ New `getTrashedItemKeys()` (`lib/zotero/client.ts`) calls Zotero's dedicated `/items/trash` endpoint (lightweight `format=keys`, paginated). `runSync()` now checks this on *every* sync - full or incremental, since trash isn't tied to a version checkpoint - and removes any matching items from the cache, the same way permanently-deleted items already were. |
+| Also fix the "changing the API key didn't force a resync" question raised alongside this | ✅ Root cause: `SyncMeta` (the sync checkpoint) is keyed only by `libraryId`, never touches the API key at all - confirmed by reading the code, not assumed. Added a **"Force full resync"** button to Settings (`runSync({ forceFullSync: true })`) that re-fetches the entire library regardless of the stored checkpoint - for general cache-recovery, though it turned out unnecessary for the trash issue itself, since that's now caught by every normal sync. |
+
+**Verification performed**: build + lint pass. Diagnosed against the
+real, live library at every step - queried the actual Zotero API
+directly (not just the local cache) to confirm the six items were real,
+that five had `data.deleted: 1`, and that the incremental `/items` feed
+genuinely omits them. Then ran an actual, real **Sync now** against
+production after the fix shipped: item count dropped from 8856 to 8844
+(12 trashed items removed - more than just this one paper's duplicates),
+and confirmed directly in MongoDB that exactly one `CareCompass` item
+remained afterward, matching Zotero's real current state exactly.
+
 ## Open / explicitly deferred
 
 - Automatic sync on app startup (currently manual button only).

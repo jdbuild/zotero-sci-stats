@@ -42,6 +42,9 @@ yarn-error.log*
 /*-deploy/
 /*-deploy.zip
 
+# local dev-tool run-state (not shared)
+/.bluebox/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
